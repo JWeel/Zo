@@ -1,0 +1,43 @@
+look like alt+enter with global scale > 1.5 causes incorrect fullscreen scale
+
+more societal organizations (institutions?) : feudal, theocratic, mercantile -> hierarchital (with T not C) 
+
+difference between cell and region and fief
+cell == (geographical) region 0
+region is one or more cells, sourced from each of variable (7) geographical region collections
+    g0 -> 1 2 3 4 5 6 7 8 9
+    g1 -> 123 456 789
+    g2 -> 123456789
+region != geographical region -> geographical region is region but not necessarily other way around
+region can be new class that contains cells inside (and color, name) -> similar to old State.cs
+fief contains regions? or cells? (and color, name) -> maybe is same as region?
+
+'map' should show depending on map
+    political map -> show all top-level fiefs -> allow finding independent inside
+                    -> maybe also flattened political map that shows all fiefs (would theoretically == geo0)
+    natural map -> background
+    geographical map -> regions, can specify tier
+
+show g0 borders only for current selected fief
+
+geographical borders should be regenerated with tweak to algorithm to always place borders on same spot
+
+this code in SelectGeographicalRegion is bad because its doing First instead of dict
+but what would key be, because we want to see if any cell belongs to region
+basically we need reverse map, map from cell to the georegions it belongs to
+    if (!this.SelectedCells.Contains(cell))
+    {
+        this.Map.GeographicalRegions[this.Division.Index]
+            .First(x => x.Cells.Any(cell => cell.Rgba == rgba))
+            .Cells
+            .Each(cell => this.SelectedCells.Add(cell));
+    }
+
+new idea for borders
+when creating regions create texture for border of region
+this is made by going through the cell textures and checking if (current != 0 and any neighbor == 0)
+then assign that in the new texture as a solid color
+downside: large regions with overseas stuff create really big textures
+but textures should only be created one time (anytime region is created (or updated but regions are immutable so no))
+downside is double pixel borders that increase with globalscale and mapscale
+    -> maybe can solve that by checking only up and left instead of all 4 directions
