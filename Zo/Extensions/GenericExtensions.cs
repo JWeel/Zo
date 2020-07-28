@@ -27,6 +27,18 @@ namespace Zo.Extensions
         public static T[] IntoArray<T>(this T instance) =>
             new T[] { instance };
 
+        public static List<T> IntoList<T>(this T instance) =>
+            new List<T> { instance };
+
+        public static HashSet<T> IntoSet<T>(this T instance) =>
+            new HashSet<T> { instance };
+
+        public static Queue<T> IntoQueue<T>(this T instance) =>
+            new Queue<T>().With(queue => queue.Enqueue(instance));
+
+        public static Stack<T> IntoStack<T>(this T instance) =>
+            new Stack<T>().With(stack => stack.Push(instance));
+
         public static IEnumerable<KeyValuePair<int, T>> WithIndex<T>(this IEnumerable<T> source) =>
             source.Select((element, index) => KeyValuePair.Create(index, element));
 
@@ -34,6 +46,40 @@ namespace Zo.Extensions
         {
             foreach (var element in source)
                 effect(element);
+        }
+
+        public static void Each<T>(this IEnumerable<T> source, Action<T> headEffect, Action<T> tailEffect)
+        {
+            var enumerator = source.GetEnumerator();
+            if (!enumerator.MoveNext())
+                return;
+
+            headEffect?.Invoke(enumerator.Current);
+
+            while (enumerator.MoveNext())
+                tailEffect?.Invoke(enumerator.Current);
+        }
+
+        /// <summary> Projects each element of a sequence into a new form using one selector for the first element and a different one for all remaining elements. </summary>
+        public static IEnumerable<TNext> Select<T, TNext>(this IEnumerable<T> source, Func<T, TNext> headSelector, Func<T, TNext> tailSelector)
+        {
+            var enumerator = source.GetEnumerator();
+            if (!enumerator.MoveNext())
+                yield break;
+            yield return headSelector(enumerator.Current);
+            while (enumerator.MoveNext())
+                yield return tailSelector(enumerator.Current);
+        }
+
+        public static IEnumerable<TNext> SelectWithPrevious<T, TNext>(this IEnumerable<T> source, Func<T, TNext> firstSelector, Func<T, TNext, TNext> withPreviousSelector)
+        {
+            var enumerator = source.GetEnumerator();
+            if (!enumerator.MoveNext())
+                yield break;
+            var current = firstSelector(enumerator.Current);
+            yield return current;
+            while (enumerator.MoveNext())
+                yield return current = withPreviousSelector(enumerator.Current, current);
         }
 
         /// <summary> Extracts from an <see cref="Expression{}"/> pointing to a property the property name, a <see cref="Func{,}"/> for getting its value and an <see cref="Action{,}"/> for setting the value.
@@ -224,6 +270,21 @@ namespace Zo.Extensions
         /// <exception cref="ArgumentNullException"> Parameter <paramref name="allowedValues"/> is null. </exception>
         public static bool In<T>(this T value, IEnumerable<T> allowedValues, IEqualityComparer<T> comparer) =>
             allowedValues.Contains(value, comparer);
+
+        #endregion
+
+        #region Join
+
+        /// <summary> Concatenates the members of the <see cref="string"/> collection, using the specified separator between each member. </summary>
+        public static string Join(this IEnumerable<string> strings, string separator) =>
+            string.Join(separator, strings);
+
+        #endregion
+
+        #region As Key
+        
+        public static TValue AsKey<TKey, TValue>(this TKey key, IReadOnlyDictionary<TKey, TValue> dictionary) =>
+            dictionary[key];
 
         #endregion
     }

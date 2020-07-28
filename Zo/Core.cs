@@ -402,8 +402,8 @@ namespace Zo
             if (this.Map.SelectedRegion != null)
                 this.DrawText($"Selected: {this.Map.SelectedRegion.Name}"
                     + Environment.NewLine + $"rgba: {this.Map.SelectedRegion.Rgba}"
-                    // + Environment.NewLine + $"center: ({region.Center.PrintInt()})"
-                    // + Environment.NewLine + $"size: {region.Size}"
+                    + Environment.NewLine + $"center: ({this.Map.SelectedRegion.Center.PrintInt()})"
+                    + Environment.NewLine + $"size: {this.Map.SelectedRegion.Size}"
                     // + Environment.NewLine + $"neighbours: {region.Neighbours.Length}"
                     , this.Platform.Sizes.SideTextPosition + new Vector2(0, this.Platform.Sizes.ActualMapHeight * 3 / 5));
 

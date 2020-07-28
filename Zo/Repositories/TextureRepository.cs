@@ -81,6 +81,9 @@ namespace Zo.Repositories
         public Texture2D Create(int width, int height) =>
             new Texture2D(this.GraphicsDevice, width, height);
 
+        public Texture2D Create(int width, int height, Color[] colorsByPixelIndex) =>
+            new Texture2D(this.GraphicsDevice, width, height).WithSetData(colorsByPixelIndex);
+
         #endregion
     }
 }

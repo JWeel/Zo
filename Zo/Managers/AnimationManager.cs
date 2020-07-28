@@ -11,7 +11,7 @@ namespace Zo.Managers
 
         private const int BLINK_INTERVAL = 450;
 
-        private static readonly Color SELECTION_COLOR = new Color(250, 250, 250, 220);
+        private static readonly Color SELECTION_COLOR = new Color(250, 250, 250, 200);
 
         #endregion
 

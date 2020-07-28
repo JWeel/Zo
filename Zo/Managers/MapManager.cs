@@ -21,9 +21,6 @@ namespace Zo.Managers
         public const float BASE_ZOOM_IN_AMOUNT = 0.25f;
         public const float BASE_ZOOM_OUT_AMOUNT = -0.25f;
 
-        public static readonly Cell EMPTY_CELL = new Cell(-1, default, default, default, string.Empty, 0, default);
-        public static readonly Region EMPTY_REGION = new Region(string.Empty, default, Array.Empty<Cell>(), default);
-
         #endregion
 
         #region Constructors
@@ -196,44 +193,29 @@ namespace Zo.Managers
 
         public void SelectGeographicalRegion(Vector2 position)
         {
-            var rgba = (Rgba) this.Map.RootPixelGrid.Item(position);
+            var regionMapper = this.Map.GeographicalRegions[this.Division.Index];
+            var rgba = regionMapper.RgbaByPixelPosition.Item(position);
             if (rgba != default)
             {
-                var cell = this.Map.Cells[rgba];
-
-                // should store Color[] used for generating texture in region
-                // then using that and position can calculate if relative index is non default
-                // in which case thats the region we want
-                // and no reason to check all regions either, just selectedregion
-                // does require still mapping from position -> ?? (rgba) -> ?? (cell) -> region
-
-                // so yeah this would work but its slow as fuck
-                // should just go back to cell selection for now which at least is more reliable even if its bad on large
-                // can still try if getting rid of getdata calls in region would help
-                // that is, dont use cell method when basing new region on existing region, but use region methods
-                // also, could store colorsbypixel array in cell too so never need to do getdata
-
-                // its a lot faster now without the getdata !!!
-                // so now have to add removal which is more tricky
-
-                if (this.SelectedRegion == null)
+                if (!regionMapper.RegionByRgba.ContainsKey(rgba))
                 {
-                    this.SelectedRegion = this.Map.GeographicalRegions[this.Division.Index]
-                        .First(x => x.Cells.Any(cell => cell.Rgba == rgba));
+                    this.Debug = "No key";
+                    return;
+                }
+
+                var mappedRegion = regionMapper.RegionByRgba[rgba];
+                if (this.SelectedRegion == default)
+                {
+                    this.SelectedRegion = mappedRegion;
                 }
                 else
                 {
-                    var relativePosition = position.Round() - this.SelectedRegion.Position;
-                    if ((relativePosition.X < 0) ||
-                        (relativePosition.Y < 0) ||
-                        (relativePosition.X > this.SelectedRegion.Texture.Width) ||
-                        (relativePosition.Y > this.SelectedRegion.Texture.Height))
+                    var relativePosition = position.Floor() - this.SelectedRegion.Position;
+                    if (relativePosition.LiesWithin(this.SelectedRegion.Texture.Width, this.SelectedRegion.Texture.Height))
                     {
                         // if adding
-                        var newSelection = this.Map.GeographicalRegions[this.Division.Index]
-                            .First(x => x.Cells.Any(cell => cell.Rgba == rgba));
-                        this.SelectedRegion = new Region(newSelection.Name, newSelection.Rgba, 
-                            newSelection.YieldWith(this.SelectedRegion).ToArray(), this.Texture.Create);
+                        this.SelectedRegion = new Region(mappedRegion.Name, mappedRegion.Rgba,
+                            mappedRegion.YieldWith(this.SelectedRegion).ToArray(), this.Texture.Create);
 
                         // else deselect
                     }
@@ -249,38 +231,16 @@ namespace Zo.Managers
                         }
                         else
                         {
-                            var newSelection = this.Map.GeographicalRegions[this.Division.Index]
-                                .First(x => x.Cells.Any(cell => cell.Rgba == rgba));
-                            this.SelectedRegion = new Region(newSelection.Name, newSelection.Rgba, 
-                                newSelection.YieldWith(this.SelectedRegion).ToArray(), this.Texture.Create);
+                            this.SelectedRegion = new Region(mappedRegion.Name, mappedRegion.Rgba,
+                                mappedRegion.YieldWith(this.SelectedRegion).ToArray(), this.Texture.Create);
                         }
                     }
                 }
-
-                // if (!this.SelectedRegions.Contains(selectedRegion))
-                //     this.SelectedRegions.Add(selectedRegion);
-                // else
-                //     this.DeselectRegion(selectedRegion);
-
-                // for (int index = 0; index < this.Map.GeographicalRegions.Length && index != this.Division.Index; index++)
-                // {
-                //     this.Map.GeographicalRegions[index]
-                //         .Where(x => x.Cells.Intersect(current.Cells).Any())
-                //         .Where(this.SelectedRegions.Contains)
-                //         .Each(this.DeselectRegion);
-                // }
             }
             else
                 this.SelectedRegion = default;
-            //     this.DeselectAll();
             this.OnSelected?.Invoke();
         }
-
-        // public void DeselectRegion(Region region) =>
-        //     this.SelectedRegions.Remove(region);
-
-        // public void DeselectAll() =>
-        //     this.SelectedRegions.Clear();
 
         public void CycleMapType() =>
             this.MapType.Advance();
@@ -298,7 +258,7 @@ namespace Zo.Managers
             this.Division.Value;
 
         public Region[] GetGeographicalRegions() =>
-            this.Map.GeographicalRegions[this.Division.Index];
+            this.Map.GeographicalRegions[this.Division.Index].Regions;
 
         #endregion
 

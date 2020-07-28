@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
@@ -10,37 +11,21 @@ namespace Zo.Data
     {
         #region Constructors
 
-        // public Region(string name, Rgba rgba, Vector2 position, Texture2D texture, Func<int, int, Texture2D> textureCreator)
-        // {
-        //     this.Name = name;
-        //     this.Color = (Color) rgba;
-        //     this.OutlineColor = this.Color.Brightened(-0.18f, alpha: 0.4f);
-        //     // reason for alpha is to blend with selection -> alternatively make selection transparent?
-        //     this.Rgba = rgba;
-        //     this.Position = position;
-        //     this.Texture = texture;
-
-        //     this.Cells = cell;
-        // }
-
-        public Region(string name, Rgba rgba, Cell[] cells, Func<int, int, Texture2D> textureCreator)
+        public Region(int id, string name, Rgba rgba, Vector2 position, Vector2 center, Color[] colorsByPixelIndex, Texture2D texture, Texture2D outlineTexture)
         {
             this.Name = name;
             this.Color = (Color) rgba;
             this.OutlineColor = this.Color.Brightened(-0.18f, alpha: 0.4f);
-            // reason for alpha is to blend with selection -> alternatively make selection transparent?
             this.Rgba = rgba;
-            this.Cells = cells;
-
-            if (!cells.Any())
-                return;
-            var (position, width, height, textureData, outlineData) = this.MergeCellTextures(cells);
             this.Position = position;
-            this.ColorsByPixelIndex = textureData; 
-            this.Texture = textureCreator(width, height).WithSetData(textureData);
-            this.OutlineTexture = textureCreator(width, height).WithSetData(outlineData);
+            this.Center = center;
+            this.Size = colorsByPixelIndex.Count(x => (x != default));
+            this.ColorsByPixelIndex = colorsByPixelIndex;
+            this.Texture = texture;
+            this.OutlineTexture = outlineTexture;
         }
 
+        // TODO move to factory, move merge methods outside
         public Region(string name, Rgba rgba, Region[] regions, Func<int, int, Texture2D> textureCreator)
         {
             this.Name = name;
@@ -48,12 +33,11 @@ namespace Zo.Data
             this.OutlineColor = this.Color.Brightened(-0.18f, alpha: 0.4f);
             this.Rgba = rgba;
 
-            this.Cells = regions.SelectMany(region => region.Cells).ToArray();
-
-            // TODO share constructors
-            var (position, width, height, textureData, outlineData) = this.MergeTextures(regions);
+            var (position, center, width, height, textureData, outlineData) = this.MergeTextures(regions);
             this.Position = position;
-            this.ColorsByPixelIndex = textureData; 
+            this.Center = center;
+            this.Size = textureData.Count(x => (x != default));
+            this.ColorsByPixelIndex = textureData;
             this.Texture = textureCreator(width, height).WithSetData(textureData);
             this.OutlineTexture = textureCreator(width, height).WithSetData(outlineData);
         }
@@ -61,6 +45,8 @@ namespace Zo.Data
         #endregion
 
         #region Members
+
+        public int Id { get; }
 
         public string Name { get; }
 
@@ -70,9 +56,11 @@ namespace Zo.Data
 
         public Rgba Rgba { get; }
 
-        public Cell[] Cells { get; }
-
         public Vector2 Position { get; }
+
+        public Vector2 Center { get; }
+
+        public int Size { get; }
 
         public Color[] ColorsByPixelIndex { get; }
 
@@ -84,49 +72,27 @@ namespace Zo.Data
 
         #region Methods
 
-        protected (Vector2 Position, int Width, int Height, Color[] TextureData, Color[] OutlineData) MergeCellTextures(Cell[] cells)
+        // no one using this anymore
+        public bool Contains(Vector2 position) =>
+            position.LiesWithin(this.Position, this.Texture.Width, this.Texture.Height) &&
+                (this.ColorsByPixelIndex.Item(position - this.Position, this.Texture.Width) != default);
+
+        protected (Vector2 Position, Vector2 Center, int Width, int Height, Color[] TextureData, Color[] OutlineData) MergeTextures(Region[] regions)
         {
-            var (maxX, maxY, minX, minY) = this.CalculateRequiredTextureSize(cells);
+            var (maxX, maxY, minX, minY, sumX, sumY) = this.CalculateRequiredTextureSize(regions);
 
             var width = maxX - minX;
             var height = maxY - minY;
             var position = new Vector2(minX, minY);
+            var center = new Vector2(sumX / regions.Length, sumY / regions.Length);
 
-            var colors1D = this.MergeCellTexturesIntoColorArray(cells, width, height, position);
-            var outlineColors1D = this.CalculateTextureOutline(colors1D, width, height);
+            var colorsByPixelIndex = this.MergeTexturesIntoColorArray(regions, width, height, position);
+            var outlineColors1D = this.CalculateTextureOutline(colorsByPixelIndex, width, height);
 
-            return (position, width, height, colors1D, outlineColors1D);
+            return (position, center, width, height, colorsByPixelIndex, outlineColors1D);
         }
 
-        protected (Vector2 Position, int Width, int Height, Color[] TextureData, Color[] OutlineData) MergeTextures(Region[] regions)
-        {
-            var (maxX, maxY, minX, minY) = this.CalculateRequiredTextureSize(regions);
-
-            var width = maxX - minX;
-            var height = maxY - minY;
-            var position = new Vector2(minX, minY);
-
-            var colors1D = this.MergeTexturesIntoColorArray(regions, width, height, position);
-            var outlineColors1D = this.CalculateTextureOutline(colors1D, width, height);
-
-            return (position, width, height, colors1D, outlineColors1D);
-        }
-
-        protected (int MaxX, int MaxY, int MinX, int MinY) CalculateRequiredTextureSize(Cell[] cells)
-        {
-            int Smallest(int left, float right) =>
-                (left > right) ? (int) right : left;
-            int Largest(int left, float right) =>
-                (left < right) ? (int) right : left;
-
-            return cells
-                .Select(cell => (cell.Position, cell.Texture.Width, cell.Texture.Height))
-                .Aggregate((MaxX: 0, MaxY: 0, MinX: int.MaxValue, MinY: int.MaxValue), (aggregate, value) =>
-                    (Largest(aggregate.MaxX, value.Position.X + value.Width), Largest(aggregate.MaxY, value.Position.Y + value.Height),
-                        Smallest(aggregate.MinX, value.Position.X), Smallest(aggregate.MinY, value.Position.Y)));
-        }
-
-        protected (int MaxX, int MaxY, int MinX, int MinY) CalculateRequiredTextureSize(Region[] regions)
+        protected (int MaxX, int MaxY, int MinX, int MinY, int SumX, int SumY) CalculateRequiredTextureSize(Region[] regions)
         {
             int Smallest(int left, float right) =>
                 (left > right) ? (int) right : left;
@@ -135,45 +101,19 @@ namespace Zo.Data
 
             return regions
                 .Select(region => (region.Position, region.Texture.Width, region.Texture.Height))
-                .Aggregate((MaxX: 0, MaxY: 0, MinX: int.MaxValue, MinY: int.MaxValue), (aggregate, value) =>
+                .Aggregate((MaxX: 0, MaxY: 0, MinX: int.MaxValue, MinY: int.MaxValue, SumX: 0, SumY: 0), (aggregate, value) =>
                     (Largest(aggregate.MaxX, value.Position.X + value.Width), Largest(aggregate.MaxY, value.Position.Y + value.Height),
-                        Smallest(aggregate.MinX, value.Position.X), Smallest(aggregate.MinY, value.Position.Y)));
-        }
-
-        protected Color[] MergeCellTexturesIntoColorArray(Cell[] cells, int width, int height, Vector2 position)
-        {
-            var colors1D = new Color[width * height];
-            var cellInfo = cells
-                .Select(cell => (Offset: (cell.Position - position), cell.Texture.Width, cell.Texture.Height, Colors1D: cell.Texture.GetColorsByPixelIndex()))
-                .ToArray();
-            for (int index = 0; index < colors1D.Length; index++)
-            {
-                var x = index % width;
-                var y = index / width;
-                foreach (var cell in cellInfo)
-                {
-                    var cellX = x - (int) cell.Offset.X;
-                    var cellY = y - (int) cell.Offset.Y;
-                    if (cellX < 0) continue;
-                    if (cellX >= cell.Width) continue;
-                    if (cellY < 0) continue;
-                    if (cellY >= cell.Height) continue;
-                    var cellIndex = cellX + (cellY * cell.Width);
-                    var cellColor = cell.Colors1D[cellIndex];
-                    if (cellColor == default) continue;
-                    colors1D[index] = Color.White;
-                }
-            }
-            return colors1D;
+                        Smallest(aggregate.MinX, value.Position.X), Smallest(aggregate.MinY, value.Position.Y),
+                            aggregate.SumX + (int) value.Position.X, aggregate.SumY + (int) value.Position.Y));
         }
 
         protected Color[] MergeTexturesIntoColorArray(Region[] regions, int width, int height, Vector2 position)
         {
-            var colors1D = new Color[width * height];
+            var colorsByPixelIndex = new Color[width * height];
             var regionInfo = regions
                 .Select(region => (Offset: (region.Position - position), region.Texture.Width, region.Texture.Height, Colors1D: region.ColorsByPixelIndex))
                 .ToArray();
-            for (int index = 0; index < colors1D.Length; index++)
+            for (int index = 0; index < colorsByPixelIndex.Length; index++)
             {
                 var x = index % width;
                 var y = index / width;
@@ -188,12 +128,13 @@ namespace Zo.Data
                     var regionIndex = regionX + (regionY * region.Width);
                     var regionColor = region.Colors1D[regionIndex];
                     if (regionColor == default) continue;
-                    colors1D[index] = Color.White;
+                    colorsByPixelIndex[index] = Color.White;
                 }
             }
-            return colors1D;
+            return colorsByPixelIndex;
         }
 
+        // TODO: remove -> it is duplicated in Map.cs
         protected Color[] CalculateTextureOutline(Color[] colors1D, int width, int height)
         {
             var outlineColors1D = new Color[width * height];

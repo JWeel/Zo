@@ -41,3 +41,12 @@ downside: large regions with overseas stuff create really big textures
 but textures should only be created one time (anytime region is created (or updated but regions are immutable so no))
 downside is double pixel borders that increase with globalscale and mapscale
     -> maybe can solve that by checking only up and left instead of all 4 directions
+
+why root region selection sometimes does not work
+looks like it returns index being default which does not make sense
+    because there should be at least one region inbound with non default
+
+regioncollection that contains
+    regions[]
+    map from pixelposition -> region
+    map from rgba -> pixelpositions

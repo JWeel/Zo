@@ -7,7 +7,8 @@ namespace Zo.Data
     {
         #region Constructors
 
-        public Cell(int id, Rgba rgba, Vector2 center, Vector2 position, string name, int size, Texture2D texture)
+        public Cell(int id, Rgba rgba, Vector2 center, Vector2 position, string name, int size,
+            Color[] colorsByPixelIndex, Texture2D texture, Texture2D outlineTexture)
         {
             this.Id = id;
             this.Color = (Color) rgba;
@@ -16,8 +17,10 @@ namespace Zo.Data
             this.Position = position;
             this.Name = name;
             this.Size = size;
+            this.ColorsByPixelIndex = colorsByPixelIndex;
             this.Texture = texture;
-            
+            this.OutlineTexture = outlineTexture;
+
             this.OriginalColor = this.Color;
         }
 
@@ -39,8 +42,13 @@ namespace Zo.Data
 
         public int Size { get; }
 
+        public Color[] ColorsByPixelIndex { get; }
+
         public Texture2D Texture { get; }
 
+        public Texture2D OutlineTexture { get; }
+
+        // ??
         protected Color OriginalColor { get; }
 
         public Cell[] Neighbours { get; protected set; }

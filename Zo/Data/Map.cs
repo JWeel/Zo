@@ -28,7 +28,7 @@ namespace Zo.Data
 
         public Rgba[,] RootPixelGrid { get; protected set; }
 
-        public Region[][] GeographicalRegions { get; protected set; }
+        public RegionMapper[] GeographicalRegions { get; protected set; }
 
         #endregion
 
@@ -38,64 +38,104 @@ namespace Zo.Data
         {
             this.DefineGeographicalRoot(this.Texture.GeographicalRegion0);
             this.DefineGeographicalRegions(this.Texture.GeographicalRegions);
-            // TODO ^ change to use region instead of cell
-            // make first one copy everything from root
-            // then all after copy everything from index-1
-            // then we can get rid of region constructor taking cells
-            // then get rid of cells property if come up with way to map to region
-
-            // var stateColor = new Rgba("00A0A0");
-            // States = new Dictionary<Dye, State>();
-            // States[stateColor] = new State(stateColor, "Yes", new List<Cell> { Cells[new Dye("E6DC64")], Cells[new Dye("D6907F")], Cells[new Dye("857DD5")] });
-            // //States[stateColor] = new State(stateColor, "Yes", new List<Cell> { Cells[new Dye("AD73A7")], Cells[new Dye("97AED8")], Cells[new Dye("6C8D7C")], Cells[new Dye("696694")], Cells[new Dye("90B7E1")] });
-            // //States[stateColor] = new State(stateColor, "Yes", Cells.Values.ToList() );
-            // States[stateColor].Cells.Remove(Cells[default]);
         }
 
         #endregion
 
         #region Protected Methods
 
-        protected void DefineGeographicalRegions(Texture2D[] sourceTextures)
-        {
-            var enumerator = sourceTextures.GetEnumerator();
-            if (!enumerator.MoveNext()) return;
-
-            this.GeographicalRegions = new Region[sourceTextures.Length][];
-
-            var index = 0;
-            this.GeographicalRegions[index++] = this.Cells.Values
-                .Select(cell => new Region(cell.Name, cell.Rgba, cell.IntoArray(), this.Texture.Create))
+        protected void DefineGeographicalRegions(Texture2D[] sourceTextures) =>
+            this.GeographicalRegions = sourceTextures
+                .Select(this.MapGeographicalRegions)
                 .ToArray();
 
-            while (enumerator.MoveNext())
-                this.GeographicalRegions[index++] = this.GetGeographicalRegion((Texture2D) enumerator.Current);
+        protected RegionMapper MapGeographicalRegions(Texture2D sourceTexture)
+        {
+            int Smallest(float left, float right) =>
+                (int) ((left > right) ? right : left);
+            int Largest(float left, float right) =>
+                (int) ((left < right) ? right : left);
 
-            // this.GeographicalRegions = sourceTextures
-            //     .Select(this.GetGeographicalRegion)
-            //     .ToArray();
+            var rgbaByPixelPosition = new Rgba[sourceTexture.Width, sourceTexture.Height];
+            var (sourceColorsByPixelIndex, pixelPositionsByRgba) = this.MapPixelPositionsByRgba(sourceTexture);
+            var regionByRgba = pixelPositionsByRgba
+                .WithIndex()
+                .Where(x => x.Value.Rgba != default) // shaves 10 sec off load time
+                .ToDictionary(x => x.Value.Rgba, x =>
+                {
+                    var id = x.Key;
+                    var (rgba, pixelPositions) = x.Value;
+
+                    var (maxX, maxY, minX, minY, sumX, sumY) = pixelPositions
+                        .Aggregate((MaxX: 0, MaxY: 0, MinX: int.MaxValue, MinY: int.MaxValue, SumX: 0, SumY: 0),
+                            (aggregate, value) =>
+                                (Largest(aggregate.MaxX, value.X), Largest(aggregate.MaxY, value.Y),
+                                    Smallest(aggregate.MinX, value.X), Smallest(aggregate.MinY, value.Y),
+                                        aggregate.SumX + (int) value.X, aggregate.SumY + (int) value.Y));
+
+                    var centerX = sumX / pixelPositions.Length;
+                    var centerY = sumY / pixelPositions.Length;
+
+                    var width = maxX - minX + 1 ;
+                    var height = maxY - minY + 1;
+                    var colorsByPixelIndex = new Color[width * height];
+                    for (int i = minX; i <= maxX; i++)
+                    {
+                        for (int j = minY; j <= maxY; j++)
+                        {
+                            var color = sourceColorsByPixelIndex.Item(new Vector2(i, j), sourceTexture.Width);
+                            if (color == (Color) rgba)
+                            {
+                                int index = (i - minX) + ((j - minY) * width);
+                                colorsByPixelIndex[index] = Color.White;
+                                rgbaByPixelPosition[i, j] = rgba;
+                            }
+                        }
+                    }
+                    var outlineColorsByPixelIndex = this.CalculateOutline(colorsByPixelIndex, width, height);
+
+                    var texture = this.Texture.Create(width, height, colorsByPixelIndex);
+                    var outlineTexture = this.Texture.Create(width, height, outlineColorsByPixelIndex);
+
+                    var position = new Vector2(minX, minY);
+                    var center = new Vector2(centerX, centerY);
+                    return new Region(id, rgba.Value.ToString(), rgba, position, center,
+                        colorsByPixelIndex, texture, outlineTexture);
+                });
+
+            return new RegionMapper(rgbaByPixelPosition, regionByRgba);
         }
 
-        protected Region[] GetGeographicalRegion(Texture2D sourceTexture) =>
-            this.MapPixelPositionsByRgbaValue(sourceTexture)
-                .Where(x => (x.Rgba != default))
-                .Select(tuple => tuple.PixelPositions
-                    .Select(position => this.RootPixelGrid.Item(position))
-                    .Distinct()
-                    .Select(rgba => this.Cells[rgba])
-                    .ToArray()
-                    .Into(cells => new Region(tuple.Rgba.Value.ToString(), tuple.Rgba, cells, this.Texture.Create)))
-                .ToArray();
+        // protected Region[] ElevateGeographicalRegions(Texture2D sourceTexture, Region[] previousGeographicalRegions) =>
+        //     this.MapPixelPositionsByRgbaValue(sourceTexture)
+        //         .Where(x => (x.Rgba != default))
+        //         .Select(tuple => tuple.PixelPositions
+        //             .Select(position => this.RootPixelGrid.Item(position))
+        //             .Distinct()
+        //             .Select(rgba => previousGeographicalRegions.First(region => region.Rgba == rgba))
+        //             .ToArray()
+        //             .Into(regions => new Region(tuple.Rgba.Value.ToString(), tuple.Rgba, regions, this.Texture.Create)))
+        //         .ToArray();
+
+        // protected Region[] ElevateGeographicalRegions(Texture2D sourceTexture, Region[] previousGeographicalRegions) =>
+        //     this.MapPixelPositionsByRgbaValue(sourceTexture)
+        //         .Where(x => (x.Rgba != default))
+        //         .Select(tuple => tuple.PixelPositions
+        //             .Into(positions => previousGeographicalRegions
+        //                 .Where(region => positions.Any(position => region.Contains(position))))
+        //             .Distinct()
+        //             .ToArray()
+        //             .Into(regions => new Region(tuple.Rgba.Value.ToString(), tuple.Rgba, regions, this.Texture.Create)))
+        //         .ToArray();
 
         protected void DefineGeographicalRoot(Texture2D sourceTexture)
         {
-            var colors1D = sourceTexture.GetColorsByPixelIndex();
-            var pixelPositionsByRgbaValues = this.MapPixelPositionsByRgbaValue(colors1D, sourceTexture.Width);
+            var (colorsByPixelIndex, pixelPositionsByRgbaValues) = this.MapPixelPositionsByRgba(sourceTexture);
 
             var cells = this.MapCellsByRgba(pixelPositionsByRgbaValues);
 
             // for Cell (geographical0 only)
-            this.AssignRootCellData(colors1D, sourceTexture.Width, sourceTexture.Height, pixelPositionsByRgbaValues,
+            this.AssignRootCellData(colorsByPixelIndex, sourceTexture.Width, sourceTexture.Height, pixelPositionsByRgbaValues,
                 out var localPixelGrid, out var neighboursByRgba);
             var emptyNeighboours = new HashSet<Rgba>();
             cells.Values
@@ -108,17 +148,16 @@ namespace Zo.Data
             this.RootPixelGrid = localPixelGrid;
         }
 
-        protected (Rgba Rgba, Vector2[] PixelPositions)[] MapPixelPositionsByRgbaValue(Texture2D texture) =>
-            texture.GetColorsByPixelIndex()
-                .Into(colors1D => this.MapPixelPositionsByRgbaValue(colors1D, texture.Width));
-
-        protected (Rgba Rgba, Vector2[] PixelPositions)[] MapPixelPositionsByRgbaValue(Color[] pixelColors, int divisor) =>
-            pixelColors
-                .Select((color, index) => (Color: color, X: index % divisor, Y: index / divisor))
-                .Select(tuple => (Rgba: new Rgba(tuple.Color), Position: new Vector2(tuple.X, tuple.Y)))
-                .GroupBy(tuple => tuple.Rgba)
-                .Select(group => (Rgba: group.Key, PixelPositions: group.Select(x => x.Position).ToArray()))
-                .ToArray();
+        protected (Color[] colorsByPixelIndex, (Rgba Rgba, Vector2[] PixelPositions)[] PixelPositionsByRgba) MapPixelPositionsByRgba(Texture2D texture) =>
+            texture
+                .GetColorsByPixelIndex()
+                .Into(colorsByPixelIndex => colorsByPixelIndex
+                    .Select((color, index) => (Color: color, X: index % texture.Width, Y: index / texture.Width))
+                    .Select(tuple => (Rgba: new Rgba(tuple.Color), Position: new Vector2(tuple.X, tuple.Y)))
+                    .GroupBy(tuple => tuple.Rgba)
+                    .Select(group => (Rgba: group.Key, PixelPositions: group.Select(x => x.Position).ToArray()))
+                    .ToArray()
+                    .Into(pixelPositionsByRgba => (colorsByPixelIndex, pixelPositionsByRgba)));
 
         protected void AssignRootCellData(Color[] pixelColors, int width, int height,
             (Rgba Rgba, Vector2[] PixelPositions)[] pixelPositionsByRgbaValues,
@@ -172,7 +211,7 @@ namespace Zo.Data
 
                     var width = rightmost - leftmost + 1;
                     var height = bottommost - topmost + 1;
-                    var cell1D = new Color[width * height];
+                    var colorsByPixelIndex = new Color[width * height];
                     for (int i = leftmost; i < leftmost + width; i++)
                     {
                         for (int j = topmost; j < topmost + height; j++)
@@ -180,15 +219,70 @@ namespace Zo.Data
                             int index = (i - leftmost) + ((j - topmost) * width);
 
                             if (pixelPositions.Any(xy => xy.X == i && xy.Y == j))
-                                cell1D[index] = Color.White;
+                                colorsByPixelIndex[index] = Color.White;
                         }
                     }
-                    var texture = this.Texture.Create(width, height);
-                    texture.SetData(cell1D);
+                    var outlineColorsByPixelIndex = this.CalculateOutline(colorsByPixelIndex, width, height);
+
+                    var texture = this.Texture.Create(width, height, colorsByPixelIndex);
+                    var outlineTexture = this.Texture.Create(width, height, outlineColorsByPixelIndex);
 
                     return new Cell(id, pair.Rgba, new Vector2(centerX, centerY), new Vector2(leftmost, topmost),
-                        pair.Rgba.Value.ToString(), pixelPositions.Length, texture); //, neighboursByCell[rgba]);
+                        pair.Rgba.Value.ToString(), pixelPositions.Length, colorsByPixelIndex, texture, outlineTexture); //, neighboursByCell[rgba]);
                 });
+
+        protected Color[] CalculateOutline(Color[] colorsByPixelIndex, int width, int height)
+        {
+            var outlineColors1D = new Color[width * height];
+            for (int index = 0; index < colorsByPixelIndex.Length; index++)
+            {
+                var color = colorsByPixelIndex[index];
+                if (color == default) continue;
+                var x = index % width;
+                var y = index / width;
+
+                if (x > 0)
+                {
+                    int leftX = (x - 1) + (y * width);
+                    var leftColor = colorsByPixelIndex[leftX];
+                    if (leftColor != color)
+                        outlineColors1D[index] = Color.White;
+                }
+                else
+                    outlineColors1D[index] = Color.White;
+
+                if (x < width - 1)
+                {
+                    int rightX = (x + 1) + (y * width);
+                    var rightColor = colorsByPixelIndex[rightX];
+                    if (rightColor != color)
+                        outlineColors1D[index] = Color.White;
+                }
+                else
+                    outlineColors1D[index] = Color.White;
+
+                if (y > 0)
+                {
+                    int topY = x + ((y - 1) * width);
+                    var topColor = colorsByPixelIndex[topY];
+                    if (topColor != color)
+                        outlineColors1D[index] = Color.White;
+                }
+                else
+                    outlineColors1D[index] = Color.White;
+
+                if (y < height - 1)
+                {
+                    int bottomY = x + ((y + 1) * width);
+                    var bottomColor = colorsByPixelIndex[bottomY];
+                    if (bottomColor != color)
+                        outlineColors1D[index] = Color.White;
+                }
+                else
+                    outlineColors1D[index] = Color.White;
+            }
+            return outlineColors1D;
+        }
 
         #endregion
     }
