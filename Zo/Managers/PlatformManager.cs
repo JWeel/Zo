@@ -18,8 +18,6 @@ namespace Zo.Managers
         public static readonly Color WINDOW_COLOR = new Color(40, 40, 50);
         public static readonly Color SIDE_PANEL_COLOR = new Color(60, 60, 70);
 
-        public static readonly char[] UNSUPPORTED_CHARS = new[] { '\r' };
-
         #endregion
 
         #region Constructors

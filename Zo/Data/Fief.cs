@@ -15,6 +15,7 @@ namespace Zo.Data
 
         #region Members
 
+        protected Region Region { get; }
         protected List<Cell> Cells { get; }
 
         #endregion

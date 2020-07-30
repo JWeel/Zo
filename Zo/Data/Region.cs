@@ -4,6 +4,7 @@ using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Linq;
 using Zo.Extensions;
+using System.Collections.Generic;
 
 namespace Zo.Data
 {
@@ -13,6 +14,7 @@ namespace Zo.Data
 
         public Region(int id, string name, Rgba rgba, Vector2 position, Vector2 center, Color[] colorsByPixelIndex, Texture2D texture, Texture2D outlineTexture)
         {
+            this.Id = id;
             this.Name = name;
             this.Color = (Color) rgba;
             this.OutlineColor = this.Color.Brightened(-0.18f, alpha: 0.4f);
@@ -26,7 +28,7 @@ namespace Zo.Data
         }
 
         // TODO move to factory, move merge methods outside
-        public Region(string name, Rgba rgba, Region[] regions, Func<int, int, Texture2D> textureCreator)
+        public Region(string name, Rgba rgba, IEnumerable<Region> regions, Func<int, int, Texture2D> textureCreator)
         {
             this.Name = name;
             this.Color = (Color) rgba;
@@ -40,6 +42,24 @@ namespace Zo.Data
             this.ColorsByPixelIndex = textureData;
             this.Texture = textureCreator(width, height).WithSetData(textureData);
             this.OutlineTexture = textureCreator(width, height).WithSetData(outlineData);
+        }
+
+        // TODO move to factory, move merge methods outside
+        public Region(string name, Rgba rgba, Region exclusionRegion, Region sourceRegion, Func<int, int, Texture2D> textureCreator)
+        {
+            this.Name = name;
+            this.Color = (Color) rgba;
+            this.OutlineColor = this.Color.Brightened(-0.18f, alpha: 0.4f);
+            this.Rgba = rgba;
+
+            var colorsByPixelIndex = this.GetColorsByPixelIndexWithoutRegion(sourceRegion, exclusionRegion);
+            var outlineColorsByPixelIndex = this.CalculateTextureOutline(colorsByPixelIndex, sourceRegion.Texture.Width, sourceRegion.Texture.Height);
+            this.Position = sourceRegion.Position;
+            this.Center = sourceRegion.Center;
+            this.Size = colorsByPixelIndex.Count(x => (x != default));
+            this.ColorsByPixelIndex = colorsByPixelIndex;
+            this.Texture = textureCreator(sourceRegion.Texture.Width, sourceRegion.Texture.Height).WithSetData(colorsByPixelIndex);
+            this.OutlineTexture = textureCreator(sourceRegion.Texture.Width, sourceRegion.Texture.Height).WithSetData(outlineColorsByPixelIndex);
         }
 
         #endregion
@@ -77,8 +97,9 @@ namespace Zo.Data
             position.LiesWithin(this.Position, this.Texture.Width, this.Texture.Height) &&
                 (this.ColorsByPixelIndex.Item(position - this.Position, this.Texture.Width) != default);
 
-        protected (Vector2 Position, Vector2 Center, int Width, int Height, Color[] TextureData, Color[] OutlineData) MergeTextures(Region[] regions)
+        protected (Vector2 Position, Vector2 Center, int Width, int Height, Color[] TextureData, Color[] OutlineData) MergeTextures(IEnumerable<Region> regionEnumerable)
         {
+            var regions = regionEnumerable.ToArray();
             var (maxX, maxY, minX, minY, sumX, sumY) = this.CalculateRequiredTextureSize(regions);
 
             var width = maxX - minX;
@@ -184,6 +205,30 @@ namespace Zo.Data
             }
 
             return outlineColors1D;
+        }
+
+        protected Color[] GetColorsByPixelIndexWithoutRegion(Region sourceRegion, Region exclusionRegion)
+        {
+            var withoutColorsByPixelIndex = new Color[sourceRegion.ColorsByPixelIndex.Length];
+            sourceRegion.ColorsByPixelIndex.CopyTo(withoutColorsByPixelIndex, index: 0);
+
+            var relativePosition = sourceRegion.Position - exclusionRegion.Position;
+            for (int index = 0; index < exclusionRegion.ColorsByPixelIndex.Length; index++)
+            {
+                if (exclusionRegion.ColorsByPixelIndex[index] != default)
+                {
+                    var x = index % exclusionRegion.Texture.Width;
+                    var y = index / exclusionRegion.Texture.Width;
+                    var position = new Vector2(x, y);
+                    var positionOnSource = position - relativePosition;
+                    if (!positionOnSource.LiesWithin(sourceRegion.Texture.Width, sourceRegion.Texture.Height)) continue;
+                    
+                    var sourceIndex = (int) positionOnSource.X + (int) positionOnSource.Y * sourceRegion.Texture.Width;
+                    // if ((sourceIndex < 0) || (sourceIndex >= withoutColorsByPixelIndex.Length)) continue;
+                    withoutColorsByPixelIndex[sourceIndex] = default;
+                }
+            }
+            return withoutColorsByPixelIndex;
         }
 
         #endregion

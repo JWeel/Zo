@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System.Threading.Tasks;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
@@ -64,7 +65,7 @@ namespace Zo
             this.Input = new InputManager(this.Platform.Sizes, subscription => this.OnUpdate += subscription);
             this.Text = new TextManager(this.Platform.Sizes, subscription => this.OnUpdate += subscription);
             this.Map = new MapManager(this.Platform.Sizes, this.Texture, subscription => this.OnUpdate += subscription);
-            this.Animation = new AnimationManager(subscription => this.OnUpdate += subscription, this.Map.SubscribeToSelect);
+            this.Animation = new AnimationManager(subscription => this.OnUpdate += subscription, subscription => this.Map.OnSelected += subscription);// this.Map.SubscribeToSelect);
 
             // if GameWindow.AllowUserResizing is set in our ctor, 
             //      1 the GameWindow.ClientSizeChanged event gets raised
@@ -295,6 +296,14 @@ namespace Zo
             switch (this.Map.GetMapType())
             {
                 case MapType.Political:
+                    this.Map.GetGeographicalRegions()
+                        .Each(region => this.SpriteBatch.DrawAt(
+                                texture: region.OutlineTexture,
+                                position: (region.Position * actualMapScale) + this.Map.ActualPosition,
+                                color: new Color(50, 50, 50, 40),
+                                scale: actualMapScale,
+                                depth: 0.3f
+                            ));
                     break;
                 case MapType.Natural:
                     if (this.Map.VisibleBorder)
@@ -359,20 +368,6 @@ namespace Zo
                 ));
 
 
-            var debug = string.Empty;
-            var a = new Vector2(
-                x: (this.Map.ActualPosition.X / (-this.Map.Scale + this.Platform.GlobalScale)),
-                y: (this.Map.ActualPosition.Y / (-this.Map.Scale + this.Platform.GlobalScale)));
-            var b = new Vector2(
-                x: (this.Map.Sizes.ActualMapWidth / this.Map.Scale / 2),
-                y: (this.Map.Sizes.ActualMapHeight / this.Map.Scale / 2));
-            debug += a.PrintInt() + Environment.NewLine + b.PrintInt();
-
-            var loc = this.Map.ViewCenterRectangle.Location - new Point(this.Map.ViewCenterRectangle.Width / 2, this.Map.ViewCenterRectangle.Height / 2);
-            debug += Environment.NewLine + "loc: " + loc.X + "," + loc.Y;
-            debug += Environment.NewLine + (loc.X / this.Map.Scale) + "," + (loc.Y / this.Map.Scale);
-            debug += Environment.NewLine + "---";
-
             var relativeMouse = (this.Input.CurrentMouseState.ToVector2() - new Vector2(this.Platform.Sizes.BorderSize));
             this.DrawText(
                 $"Global Scale {this.Platform.GlobalScale}"
@@ -384,26 +379,30 @@ namespace Zo
                 + $"Map Pos {this.Map.ActualPosition.PrintInt()}"
                 + Environment.NewLine
                 + $"Mouse Pos {relativeMouse.PrintInt()}"
-                + Environment.NewLine
-                + $"View Center {this.Map.ViewCenter.PrintInt()}"
-                + Environment.NewLine
-                + $"Map Center {this.Map.ViewMapCenter.PrintInt()}"
-                + Environment.NewLine
-                + $"Border {this.Platform.Sizes.BorderSize}"
-                + Environment.NewLine
-                + debug
+                // + $"View Center {this.Map.ViewCenter.PrintInt()}"
+                // + Environment.NewLine
+                // + $"Map Center {this.Map.ViewMapCenter.PrintInt()}"
+                // + Environment.NewLine
+                // + $"Border {this.Platform.Sizes.BorderSize}"
+                // + Environment.NewLine
+                + Environment.NewLine + this.Platform.Device.GraphicsDevice.DisplayMode.Width
+                + Environment.NewLine + this.Platform.Device.GraphicsDevice.DisplayMode.Height
+                + Environment.NewLine + this.Platform.Device.GraphicsDevice.DisplayMode.Width / (float) SizeManager.BASE_TOTAL_WIDTH
+                + Environment.NewLine + this.Platform.Device.GraphicsDevice.DisplayMode.Height / (float) SizeManager.BASE_TOTAL_HEIGHT
                 , this.Platform.Sizes.SideTextPosition);
 
             this.DrawText(this.Map.Debug,
                 this.Platform.Sizes.SideTextPosition + new Vector2(0, this.Platform.Sizes.ActualMapHeight * 2 / 5));
 
 
-            // cell selection text should work by Stack
-            if (this.Map.SelectedRegion != null)
-                this.DrawText($"Selected: {this.Map.SelectedRegion.Name}"
-                    + Environment.NewLine + $"rgba: {this.Map.SelectedRegion.Rgba}"
-                    + Environment.NewLine + $"center: ({this.Map.SelectedRegion.Center.PrintInt()})"
-                    + Environment.NewLine + $"size: {this.Map.SelectedRegion.Size}"
+            // cell selection text should work by Stack?
+            if (this.Map.LastSelectedRegion != null)
+                this.DrawText($"Selected: {this.Map.LastSelectedRegion.Name}"
+                    + Environment.NewLine + $"id: {this.Map.LastSelectedRegion.Id}"
+                    + Environment.NewLine + $"rgba: {this.Map.LastSelectedRegion.Rgba}"
+                    + Environment.NewLine + $"position: {this.Map.LastSelectedRegion.Position.PrintInt()}"
+                    + Environment.NewLine + $"center: ({this.Map.LastSelectedRegion.Center.PrintInt()})"
+                    + Environment.NewLine + $"size: {this.Map.LastSelectedRegion.Size}"
                     // + Environment.NewLine + $"neighbours: {region.Neighbours.Length}"
                     , this.Platform.Sizes.SideTextPosition + new Vector2(0, this.Platform.Sizes.ActualMapHeight * 3 / 5));
 
@@ -488,17 +487,24 @@ namespace Zo
 
         // this.Window.ClientSizeChanged gets called 3 times after resizing the window ??!!
         // EVEN if we unsubscribe in the method and not resubscribe until disposal ??!!
-        // so instead we delay resubscribing until the next Update call
+        // so instead we can delay resubscribing until the next Update call
+        // but if resizing is slow (Update gets called before resizing is finished), then it resubscribes too early
+        // so instead to waiting for another update call, we add a timed delay
         protected void OnWindowResize(object sender, EventArgs e)
         {
             using var scope = this.OnWindowResizeDelayedResubscriptionScope();
             this.Platform.SetGlobalScaleByDimensions(this.Window.ClientBounds.Width, this.Window.ClientBounds.Height);
         }
 
+        protected bool _canDelayResubscription = true;
         protected Scope OnWindowResizeDelayedResubscriptionScope()
         {
             Action preOperation = () => this.Window.ClientSizeChanged -= this.OnWindowResize;
-            Action postOperation = () => this.OnUpdate += this.ResubscribeOnWindowResize;
+            Action postOperation = () => _canDelayResubscription.Case(() =>
+                {
+                    _canDelayResubscription = false;
+                    Task.Delay(500).ContinueWith(_ => this.ResubscribeOnWindowResize());
+                });
             return new Scope(preOperation, postOperation);
         }
 
@@ -506,6 +512,7 @@ namespace Zo
         {
             this.Window.ClientSizeChanged += this.OnWindowResize;
             this.OnUpdate -= this.ResubscribeOnWindowResize;
+            _canDelayResubscription = true;
         }
 
         #endregion

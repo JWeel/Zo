@@ -1,3 +1,5 @@
+using System.Xml.Linq;
+using System.Runtime.CompilerServices;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using System;
@@ -49,7 +51,7 @@ namespace Zo.Managers
 
         #region Properties
 
-        protected event Action OnSelected;
+        public event Action OnSelected;
 
         public SizeManager Sizes { get; }
 
@@ -94,9 +96,10 @@ namespace Zo.Managers
         public bool VisibleBorder { get; set; }
 
         protected Map Map { get; set; }
-        public Dictionary<Rgba, Cell> Cells => this.Map.Cells;
 
         public Region SelectedRegion { get; protected set; }
+        
+        public Region LastSelectedRegion { get; protected set; }
 
         protected Vector2 LastRelativePosition { get; set; }
 
@@ -197,48 +200,34 @@ namespace Zo.Managers
             var rgba = regionMapper.RgbaByPixelPosition.Item(position);
             if (rgba != default)
             {
-                if (!regionMapper.RegionByRgba.ContainsKey(rgba))
-                {
-                    this.Debug = "No key";
-                    return;
-                }
-
                 var mappedRegion = regionMapper.RegionByRgba[rgba];
+                this.LastSelectedRegion = mappedRegion;
                 if (this.SelectedRegion == default)
-                {
                     this.SelectedRegion = mappedRegion;
-                }
                 else
                 {
                     var relativePosition = position.Floor() - this.SelectedRegion.Position;
-                    if (relativePosition.LiesWithin(this.SelectedRegion.Texture.Width, this.SelectedRegion.Texture.Height))
+                    if (relativePosition.LiesWithin(this.SelectedRegion.Texture.Width, this.SelectedRegion.Texture.Height)
+                        && this.SelectedRegion.ColorsByPixelIndex
+                            .In2D(this.SelectedRegion.Texture.Width)
+                            .Any(tuple => (tuple.Position == relativePosition) && (tuple.Value != default)))
                     {
-                        // if adding
-                        this.SelectedRegion = new Region(mappedRegion.Name, mappedRegion.Rgba,
-                            mappedRegion.YieldWith(this.SelectedRegion).ToArray(), this.Texture.Create);
-
-                        // else deselect
+                        var withRemovedRegion = new Region(mappedRegion.Name, mappedRegion.Rgba, mappedRegion, this.SelectedRegion, this.Texture.Create);
+                        if (withRemovedRegion.Size == 0)
+                            this.SelectedRegion = default; // not strictly necessary but makes texture smaller
+                        else
+                            this.SelectedRegion = withRemovedRegion;
                     }
                     else
-                    {
-                        var color = this.SelectedRegion.ColorsByPixelIndex
-                            .In2D(this.SelectedRegion.Texture.Width)
-                            .FirstOrDefault(tuple => (tuple.Position == relativePosition))
-                            .Value;
-                        if (color != default)
-                        {
-                            // remove current from selected region
-                        }
-                        else
-                        {
-                            this.SelectedRegion = new Region(mappedRegion.Name, mappedRegion.Rgba,
-                                mappedRegion.YieldWith(this.SelectedRegion).ToArray(), this.Texture.Create);
-                        }
-                    }
+                        this.SelectedRegion = new Region(mappedRegion.Name, mappedRegion.Rgba,
+                            mappedRegion.YieldWith(this.SelectedRegion).ToArray(), this.Texture.Create);
                 }
             }
             else
+            {
                 this.SelectedRegion = default;
+                this.LastSelectedRegion = default;
+            }
             this.OnSelected?.Invoke();
         }
 
