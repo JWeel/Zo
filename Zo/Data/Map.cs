@@ -63,7 +63,7 @@ namespace Zo.Data
                 .Where(x => x.Value.Rgba != default) // shaves 10 sec off load time
                 .ToDictionary(x => x.Value.Rgba, x =>
                 {
-                    var id = x.Key;
+                    var id = $"{sourceTexture.Name.Last()}-{x.Key}";
                     var (rgba, pixelPositions) = x.Value;
 
                     var (maxX, maxY, minX, minY, sumX, sumY) = pixelPositions
@@ -76,7 +76,7 @@ namespace Zo.Data
                     var centerX = sumX / pixelPositions.Length;
                     var centerY = sumY / pixelPositions.Length;
 
-                    var width = maxX - minX + 1 ;
+                    var width = maxX - minX + 1;
                     var height = maxY - minY + 1;
                     var colorsByPixelIndex = new Color[width * height];
                     for (int i = minX; i <= maxX; i++)
@@ -93,17 +93,34 @@ namespace Zo.Data
                         }
                     }
                     var outlineColorsByPixelIndex = this.CalculateOutline(colorsByPixelIndex, width, height);
+                    var combinedColorsByPixelIndex = this.CombineOutline(colorsByPixelIndex, outlineColorsByPixelIndex);
 
                     var texture = this.Texture.Create(width, height, colorsByPixelIndex);
                     var outlineTexture = this.Texture.Create(width, height, outlineColorsByPixelIndex);
+                    var combinedTexture = this.Texture.Create(width, height).WithSetData(combinedColorsByPixelIndex);
 
                     var position = new Vector2(minX, minY);
                     var center = new Vector2(centerX, centerY);
                     return new Region(id, rgba.Value.ToString(), rgba, position, center,
-                        colorsByPixelIndex, texture, outlineTexture);
+                        colorsByPixelIndex, texture, outlineTexture, combinedTexture);
                 });
 
             return new RegionMapper(rgbaByPixelPosition, regionByRgba);
+        }
+
+        protected Color[] CombineOutline(Color[] colorsByPixelIndex, Color[] outlineColorsByPixelIndex)
+        {
+            var combinedColorsByPixelIndex = new Color[colorsByPixelIndex.Length];
+            colorsByPixelIndex.CopyTo(combinedColorsByPixelIndex, index: 0);
+
+            for (var i = 0; i < colorsByPixelIndex.Length; i++)
+            {
+                if (outlineColorsByPixelIndex[i] != default)
+                    combinedColorsByPixelIndex[i] = new Color(219, 219, 219, 255);
+                else if (colorsByPixelIndex[i] != default)
+                    combinedColorsByPixelIndex[i] = Color.White;
+            }
+            return combinedColorsByPixelIndex;
         }
 
         // protected Region[] ElevateGeographicalRegions(Texture2D sourceTexture, Region[] previousGeographicalRegions) =>

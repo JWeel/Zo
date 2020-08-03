@@ -56,6 +56,8 @@ namespace Zo
         protected Cycle<Division> BorderCycle { get; } =
             new Cycle<Division>(((Division) (-1)).YieldWith((default(Division).GetValues())).ToArray());
 
+        protected FrameManager Frame { get; set; }
+
         #endregion
 
         #region Overriden Methods
@@ -66,6 +68,8 @@ namespace Zo
             this.Text = new TextManager(this.Platform.Sizes, subscription => this.OnUpdate += subscription);
             this.Map = new MapManager(this.Platform.Sizes, this.Texture, subscription => this.OnUpdate += subscription);
             this.Animation = new AnimationManager(subscription => this.OnUpdate += subscription, subscription => this.Map.OnSelected += subscription);// this.Map.SubscribeToSelect);
+
+            this.Frame = new FrameManager(this, this.Platform.Sizes.BorderSizeVector, Color.White, Color.Black);
 
             // if GameWindow.AllowUserResizing is set in our ctor, 
             //      1 the GameWindow.ClientSizeChanged event gets raised
@@ -89,6 +93,7 @@ namespace Zo
             this.Text.LoadContent(this.Content);
 
             this.Map.LoadContent(this.Content);
+            this.Frame.LoadContent(this.Content);
             // base.LoadContent();
         }
 
@@ -96,10 +101,11 @@ namespace Zo
         {
             // TODO confirmation
             if (this.Input.KeyPressed(Keys.Escape))
-                Exit();
+                this.Exit();
 
             // call subscribing managers
             this.OnUpdate?.Invoke();
+            this.Frame.Update(gameTime);
 
             #region Full Screen
 
@@ -247,6 +253,9 @@ namespace Zo
             if (this.Input.KeyPressed(Keys.L))
                 this.Map.VisibleBorder = !this.Map.VisibleBorder;
 
+            if (this.Input.KeyPressed(Keys.G))
+                this.Map.VisibleLabel = !this.Map.VisibleLabel;
+
             if (this.Input.KeyPressed(Keys.D8))
                 this.Map.CycleMapType();
 
@@ -326,31 +335,29 @@ namespace Zo
                     break;
                 case MapType.Geographical:
                     this.Map.GetGeographicalRegions()
-                        .Each(region => this.SpriteBatch.DrawAt(
-                                texture: region.Texture,
+                        .Each(region =>
+                        {
+                            this.SpriteBatch.DrawAt(
+                                texture: region.CombinedTexture,
                                 position: (region.Position * actualMapScale) + this.Map.ActualPosition,
                                 color: region.Color,
                                 scale: actualMapScale,
                                 depth: 0.1f
-                            ));
-                    this.Map.GetGeographicalRegions()
-                        .Each(region => this.SpriteBatch.DrawAt(
-                                texture: region.OutlineTexture,
-                                position: (region.Position * actualMapScale) + this.Map.ActualPosition,
-                                color: region.OutlineColor,
-                                scale: actualMapScale,
-                                depth: 0.3f
-                            ));
+                            );
+                            if (this.Map.VisibleLabel)
+                                this.DrawText(region.Id, (region.Center * actualMapScale) + this.Map.ActualPosition, depth: 0.45f, center: true);
+                        });
                     break;
             }
 
-            if (this.Map.SelectedRegion != null)
+            // if (this.Map.SelectedRegion.HasValue)
+            if (this.Map.SelectedRegion != default)
                 this.SpriteBatch.DrawAt(
-                    texture: this.Map.SelectedRegion.Texture,
+                    texture: this.Map.SelectedRegion.OutlineTexture,
                     position: (this.Map.SelectedRegion.Position * actualMapScale) + this.Map.ActualPosition,
                     color: this.Animation.SelectionColor.Value,
                     scale: actualMapScale,
-                    depth: 0.2f
+                    depth: 0.35f
                 );
 
             this.SpriteBatch.DrawTo(
@@ -395,13 +402,13 @@ namespace Zo
                 this.Platform.Sizes.SideTextPosition + new Vector2(0, this.Platform.Sizes.ActualMapHeight * 2 / 5));
 
 
-            // cell selection text should work by Stack?
-            if (this.Map.LastSelectedRegion != null)
+            // if (this.Map.LastSelectedRegion.HasValue)
+            if (this.Map.LastSelectedRegion != default)
                 this.DrawText($"Selected: {this.Map.LastSelectedRegion.Name}"
                     + Environment.NewLine + $"id: {this.Map.LastSelectedRegion.Id}"
                     + Environment.NewLine + $"rgba: {this.Map.LastSelectedRegion.Rgba}"
                     + Environment.NewLine + $"position: {this.Map.LastSelectedRegion.Position.PrintInt()}"
-                    + Environment.NewLine + $"center: ({this.Map.LastSelectedRegion.Center.PrintInt()})"
+                    + Environment.NewLine + $"center: {this.Map.LastSelectedRegion.Center.PrintInt()}"
                     + Environment.NewLine + $"size: {this.Map.LastSelectedRegion.Size}"
                     // + Environment.NewLine + $"neighbours: {region.Neighbours.Length}"
                     , this.Platform.Sizes.SideTextPosition + new Vector2(0, this.Platform.Sizes.ActualMapHeight * 3 / 5));
@@ -440,45 +447,31 @@ namespace Zo
             );
 
             this.SpriteBatch.End();
+
+            this.Frame.Draw(gameTime);
         }
 
         #endregion
 
         #region Helper Methods
 
-        public void DrawText(string text, Vector2 position, Color? color = default) =>
-            this.DrawText(text, position.X, position.Y, color);
-
-        public void DrawText(string text, float x, float y, Color? color = default) =>
-            this.DrawText(text, (int) x, (int) y, color);
-
-        protected void DrawText(string text, int x, int y, Color? color = default)
+        public void DrawText(string text, Vector2 position, Color? color = default, float? scale = default, float? depth = default, bool center = false)
         {
             if (text.IsNullOrWhiteSpace())
                 return;
             color.DefaultTo(Color.LightGoldenrodYellow);
+            depth.DefaultTo(0.9f);
+            scale.DefaultTo(1f);
 
-            text.Split(Environment.NewLine)
-                .WithIndex()
-                .Each(group => group.Value
-                    .WithIndex()
-                    .Each(pair =>
-                    {
-                        if (!this.Text.Supports(pair.Value) && pair.Value != TextManager.NEWLINE_CHARACTER)
-                        {
-                            // Console.WriteLine($"Unsupported character at index {pair.Key}: {pair.Value} ({(int) pair.Value})");
-                            return;
-                        }
-                        var actualX = (pair.Key * this.Platform.Sizes.ActualLetterSpacing.X) + x;
-                        var actualY = (group.Key * this.Platform.Sizes.ActualLetterSpacing.Y) + y;
-                        this.SpriteBatch.DrawAt(
-                            texture: this.Text[pair.Value],
-                            position: new Vector2(actualX, actualY),
-                            scale: this.Platform.Sizes.ActualLetterScale,
-                            color: color.Value,
-                            depth: 0.9f
-                        );
-                    }));
+            if (center)
+                position -= new Vector2(this.Text.CharacterSize.X * text.Length / 2f, 0f);
+            var shadePosition = position + new Vector2(1);
+            var shadeDepth = depth.Value - 0.01f;
+
+            this.SpriteBatch.DrawString(this.Text.Font, text, shadePosition, Color.Black,
+                rotation: 0f, origin: default, scale.Value, SpriteEffects.None, shadeDepth);
+            this.SpriteBatch.DrawString(this.Text.Font, text, position, color.Value,
+                rotation: 0f, origin: default, scale.Value, SpriteEffects.None, depth.Value);
         }
 
         #endregion

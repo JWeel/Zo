@@ -7,3 +7,21 @@ show g# borders only for current selected fief
 why have cell? what does it give over g0
 only thing right now is neighbors
 
+region.cs some ctors and helper methods should move (to mapmanager?)
+    or to static methods in region:
+        .Combine(primary, additional) -> Region;
+        .Exclude(primary, exclusion) -> Region;
+
+fiefs:
+    contain regions (and cell?)
+    require selection logic for fiefs -> may be able to mostly reuse same stuff because fief has region
+    is a hierarchy of fiefs, so contains fief collection property
+    region for root fief encompasses all regions of child fiefs + demesne (so demesne should be region also)
+    fiefs should cover all g0/cells? uncontrolled g0/cells could be controlled by placeholder fief?
+    new scenario class should contain fiefs in a prearranged manner, possibly taken from external data file (csv?)
+
+maybe region should be collection of cells but have its own texture for performance
+
+load regions async
+
+introduce new property to region which is tex+outline combined
