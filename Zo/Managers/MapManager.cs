@@ -101,7 +101,9 @@ namespace Zo.Managers
 
         public Region SelectedRegion { get; protected set; }
 
-        public Region LastSelectedRegion { get; protected set; }
+        public Fief SelectedFief { get; protected set; }
+
+        public Region LastSelection { get; protected set; }
 
         protected Vector2 LastRelativePosition { get; set; }
 
@@ -196,15 +198,15 @@ namespace Zo.Managers
         public Action<Action> SubscribeToSelect =>
             action => this.OnSelected += action;
 
-        public void SelectGeographicalRegion(Vector2 position)
+        public void SelectGeographicalRegion(Vector2 position, bool combineRegions)
         {
             var regionMapper = this.Map.GeographicalRegions[this.Division.Index];
             var rgba = regionMapper.RgbaByPixelPosition.Item(position);
             if (rgba != default)
             {
                 var mappedRegion = regionMapper.RegionByRgba[rgba];
-                this.LastSelectedRegion = mappedRegion;
-                if (this.SelectedRegion == default)
+                this.LastSelection = mappedRegion;
+                if (!combineRegions || (this.SelectedRegion == default))
                     this.SelectedRegion = mappedRegion;
                 else
                 {
@@ -214,20 +216,20 @@ namespace Zo.Managers
                             .In2D(this.SelectedRegion.Texture.Width)
                             .Any(tuple => (tuple.Position == relativePosition) && (tuple.Value != default)))
                     {
-                        var withRemovedRegion = this.DisjoinRegions(mappedRegion.Name, mappedRegion.Rgba, mappedRegion, this.SelectedRegion);
+                        var withRemovedRegion = this.Map.DisjoinRegions(mappedRegion.Name, mappedRegion.Rgba, mappedRegion, this.SelectedRegion);
                         if (withRemovedRegion.Size == 0)
                             this.SelectedRegion = default; // not strictly necessary but makes texture smaller
                         else
                             this.SelectedRegion = withRemovedRegion;
                     }
                     else
-                        this.SelectedRegion = this.CombineRegions(mappedRegion.Name, mappedRegion.Rgba, mappedRegion.YieldWith(this.SelectedRegion));
+                        this.SelectedRegion = this.Map.CombineRegions(mappedRegion.Name, mappedRegion.Rgba, mappedRegion.YieldWith(this.SelectedRegion));
                 }
             }
             else
             {
                 this.SelectedRegion = default;
-                this.LastSelectedRegion = default;
+                this.LastSelection = default;
             }
             this.OnSelected?.Invoke();
         }
@@ -250,8 +252,73 @@ namespace Zo.Managers
         public Region[] GetGeographicalRegions() =>
             this.Map.GeographicalRegions[this.Division.Index].Regions;
 
+        // bad
         public Region[] GetGeographicalRegions(int index) =>
             this.Map.GeographicalRegions[index].Regions;
+
+        public void SelectFief(Vector2 position)
+        {
+            this.LastSelection = default;
+            this.SelectedFief = default;
+            var regionMapper = this.Map.GeographicalRegions[this.Division.Index];
+            var rgba = regionMapper.RgbaByPixelPosition.Item(position);
+            if (rgba != default)
+            {
+                var mappedFief = this.Map.Fiefs.FirstOrDefault(fief => fief.Region.Contains(position));
+                if ((this.SelectedFief == default) && (mappedFief != default))
+                {
+                    this.LastSelection = mappedFief.Region;
+                    this.SelectedFief = mappedFief;
+                }
+            }
+            this.OnSelected?.Invoke();
+        }
+
+        public int GetFiefCount() => this.Map.Fiefs.Count;
+        protected int FiefCounter = 0;
+        public bool IsAddingFief { get; protected set; }
+        public void AddFief(Vector2 position)
+        {
+            var regionMapper = this.Map.GeographicalRegions[this.Division.Index];
+            var rgba = regionMapper.RgbaByPixelPosition.Item(position);
+            if (rgba == default)
+                return;
+
+            var mappedRegion = regionMapper.RegionByRgba[rgba];
+            this.Map.Fiefs
+                .Where(fief => this.SelectedFief != fief || !this.IsAddingFief)
+                .Where(fief => fief.Region.Contains(position))
+                .Each(fief => this.Map.DisjoinRegions(fief.Name, fief.Rgba, mappedRegion, fief.Region)
+                    .Into(fief.UpdateRegion));
+            this.Map.Fiefs.RemoveAll(fief => (fief.Region.Size == 0) && (fief != this.SelectedFief));
+
+            if (this.IsAddingFief)
+            {
+                if (this.SelectedFief.Region.Contains(position))
+                {
+                    Console.WriteLine("Fief contains region.");
+                    return;
+                }
+
+                var newRegion = this.Map.CombineRegions(this.SelectedFief.Name, this.SelectedFief.Rgba, this.SelectedFief.Region.YieldWith(mappedRegion));
+                this.SelectedFief.UpdateRegion(newRegion);
+            }
+            else
+            {
+                var fief = new Fief($"f-{this.FiefCounter++}", mappedRegion);
+                this.Map.Fiefs.Add(fief);
+                this.SelectedFief = fief;
+                this.IsAddingFief = true;
+            }
+        }
+
+        public void FinalizeFief()
+        {
+            this.IsAddingFief = false;
+        }
+
+        public IEnumerable<Fief> GetFiefs() =>
+            this.Map.Fiefs;
 
         #endregion
 
@@ -269,184 +336,6 @@ namespace Zo.Managers
             var newRelativePosition = this.Position / this.Sizes.ActualMapSize;
             var difference = (this.LastRelativePosition - newRelativePosition) * this.Sizes.ActualMapSize;
             this.Move(difference);
-        }
-
-        // TODO move these methods to map.cs
-        protected Region CombineRegions(string name, Rgba rgba, IEnumerable<Region> regions)
-        {
-            var id = "n/a";
-            var (position, center, width, height, colorsByPixelIndex, outlineColorsByPixelIndex) = this.MergeTextures(regions);
-            var combinedColorsByPixelIndex = this.CombineOutline(colorsByPixelIndex, outlineColorsByPixelIndex);
-
-            var texture = this.Texture.Create(width, height).WithSetData(colorsByPixelIndex);
-            var outlineTexture = this.Texture.Create(width, height).WithSetData(outlineColorsByPixelIndex);
-            var combinedTexture = this.Texture.Create(width, height).WithSetData(combinedColorsByPixelIndex);
-
-            return new Region(id, name, rgba, position, center, colorsByPixelIndex, texture, outlineTexture, combinedTexture);
-        }
-
-        protected Region DisjoinRegions(string name, Rgba rgba, Region exclusionRegion, Region sourceRegion)
-        {
-            var id = "n/a";
-            var colorsByPixelIndex = this.GetColorsByPixelIndexWithoutRegion(sourceRegion, exclusionRegion);
-            var outlineColorsByPixelIndex = this.CalculateTextureOutline(colorsByPixelIndex, sourceRegion.Texture.Width, sourceRegion.Texture.Height);
-            var combinedColorsByPixelIndex = this.CombineOutline(colorsByPixelIndex, outlineColorsByPixelIndex);
-            var position = sourceRegion.Position;
-            var center = sourceRegion.Center;
-
-            var texture = this.Texture.Create(sourceRegion.Texture.Width, sourceRegion.Texture.Height).WithSetData(colorsByPixelIndex);
-            var outlineTexture = this.Texture.Create(sourceRegion.Texture.Width, sourceRegion.Texture.Height).WithSetData(outlineColorsByPixelIndex);
-            var combinedTexture = this.Texture.Create(sourceRegion.Texture.Width, sourceRegion.Texture.Height).WithSetData(combinedColorsByPixelIndex);
-
-            return new Region(id, name, rgba, position, center, colorsByPixelIndex, texture, outlineTexture, combinedTexture);
-        }
-
-        protected Color[] CombineOutline(Color[] colorsByPixelIndex, Color[] outlineColorsByPixelIndex)
-        {
-            var combinedColorsByPixelIndex = new Color[colorsByPixelIndex.Length];
-            colorsByPixelIndex.CopyTo(combinedColorsByPixelIndex, index: 0);
-
-            for (var i = 0; i < colorsByPixelIndex.Length; i++)
-            {
-                if (outlineColorsByPixelIndex[i] != default)
-                    combinedColorsByPixelIndex[i] = new Color(219, 219, 219, 255);
-                else if (colorsByPixelIndex[i] != default)
-                    combinedColorsByPixelIndex[i] = Color.White;
-            }
-            return combinedColorsByPixelIndex;
-        }
-
-        protected (Vector2 Position, Vector2 Center, int Width, int Height, Color[] TextureData, Color[] OutlineData) MergeTextures(IEnumerable<Region> regionEnumerable)
-        {
-            var regions = regionEnumerable.ToArray();
-            var (maxX, maxY, minX, minY, sumX, sumY) = this.CalculateRequiredTextureSize(regions);
-
-            var width = maxX - minX;
-            var height = maxY - minY;
-            var position = new Vector2(minX, minY);
-            var center = new Vector2(sumX / regions.Length, sumY / regions.Length);
-
-            var colorsByPixelIndex = this.MergeTexturesIntoColorArray(regions, width, height, position);
-            var outlineColors1D = this.CalculateTextureOutline(colorsByPixelIndex, width, height);
-
-            return (position, center, width, height, colorsByPixelIndex, outlineColors1D);
-        }
-
-        protected (int MaxX, int MaxY, int MinX, int MinY, int SumX, int SumY) CalculateRequiredTextureSize(Region[] regions)
-        {
-            int Smallest(int left, float right) =>
-                (left > right) ? (int) right : left;
-            int Largest(int left, float right) =>
-                (left < right) ? (int) right : left;
-
-            return regions
-                .Select(region => (region.Position, region.Texture.Width, region.Texture.Height))
-                .Aggregate((MaxX: 0, MaxY: 0, MinX: int.MaxValue, MinY: int.MaxValue, SumX: 0, SumY: 0), (aggregate, value) =>
-                    (Largest(aggregate.MaxX, value.Position.X + value.Width), Largest(aggregate.MaxY, value.Position.Y + value.Height),
-                        Smallest(aggregate.MinX, value.Position.X), Smallest(aggregate.MinY, value.Position.Y),
-                            aggregate.SumX + (int) value.Position.X, aggregate.SumY + (int) value.Position.Y));
-        }
-
-        protected Color[] MergeTexturesIntoColorArray(Region[] regions, int width, int height, Vector2 position)
-        {
-            var colorsByPixelIndex = new Color[width * height];
-            var regionInfo = regions
-                .Select(region => (Offset: (region.Position - position), region.Texture.Width, region.Texture.Height, Colors1D: region.ColorsByPixelIndex))
-                .ToArray();
-            for (int index = 0; index < colorsByPixelIndex.Length; index++)
-            {
-                var x = index % width;
-                var y = index / width;
-                foreach (var region in regionInfo)
-                {
-                    var regionX = x - (int) region.Offset.X;
-                    var regionY = y - (int) region.Offset.Y;
-                    if (regionX < 0) continue;
-                    if (regionX >= region.Width) continue;
-                    if (regionY < 0) continue;
-                    if (regionY >= region.Height) continue;
-                    var regionIndex = regionX + (regionY * region.Width);
-                    var regionColor = region.Colors1D[regionIndex];
-                    if (regionColor == default) continue;
-                    colorsByPixelIndex[index] = Color.White;
-                }
-            }
-            return colorsByPixelIndex;
-        }
-
-        // TODO: remove -> it is duplicated in Map.cs
-        protected Color[] CalculateTextureOutline(Color[] colors1D, int width, int height)
-        {
-            var outlineColors1D = new Color[width * height];
-            for (int index = 0; index < colors1D.Length; index++)
-            {
-                var color = colors1D[index];
-                if (color == default) continue;
-                var x = index % width;
-                var y = index / width;
-
-                if (x > 0)
-                {
-                    int leftX = (x - 1) + (y * width);
-                    var leftColor = colors1D[leftX];
-                    if (leftColor == default)
-                        outlineColors1D[index] = Color.White;
-                }
-                else
-                    outlineColors1D[index] = Color.White;
-                if (x < width - 1)
-                {
-                    int rightX = (x + 1) + (y * width);
-                    var rightColor = colors1D[rightX];
-                    if (rightColor == default)
-                        outlineColors1D[index] = Color.White;
-                }
-                else
-                    outlineColors1D[index] = Color.White;
-                if (y > 0)
-                {
-                    int topY = x + ((y - 1) * width);
-                    var topColor = colors1D[topY];
-                    if (topColor == default)
-                        outlineColors1D[index] = Color.White;
-                }
-                else
-                    outlineColors1D[index] = Color.White;
-                if (y < height - 1)
-                {
-                    int bottomY = x + ((y + 1) * width);
-                    var bottomColor = colors1D[bottomY];
-                    if (bottomColor == default)
-                        outlineColors1D[index] = Color.White;
-                }
-                else
-                    outlineColors1D[index] = Color.White;
-            }
-
-            return outlineColors1D;
-        }
-
-        protected Color[] GetColorsByPixelIndexWithoutRegion(Region sourceRegion, Region exclusionRegion)
-        {
-            var withoutColorsByPixelIndex = new Color[sourceRegion.ColorsByPixelIndex.Length];
-            sourceRegion.ColorsByPixelIndex.CopyTo(withoutColorsByPixelIndex, index: 0);
-
-            var relativePosition = sourceRegion.Position - exclusionRegion.Position;
-            for (int index = 0; index < exclusionRegion.ColorsByPixelIndex.Length; index++)
-            {
-                if (exclusionRegion.ColorsByPixelIndex[index] != default)
-                {
-                    var x = index % exclusionRegion.Texture.Width;
-                    var y = index / exclusionRegion.Texture.Width;
-                    var position = new Vector2(x, y);
-                    var positionOnSource = position - relativePosition;
-                    if (!positionOnSource.LiesWithin(sourceRegion.Texture.Width, sourceRegion.Texture.Height)) continue;
-
-                    var sourceIndex = (int) positionOnSource.X + (int) positionOnSource.Y * sourceRegion.Texture.Width;
-                    withoutColorsByPixelIndex[sourceIndex] = default;
-                }
-            }
-            return withoutColorsByPixelIndex;
         }
 
         #endregion

@@ -45,6 +45,12 @@ namespace Zo.Managers
 
         public bool KeysDownAny(params Keys[] keys) => keys.Any(this.KeyDown);
 
+        public bool KeyUp(Keys key) => this.CurrentKeyboardState.IsKeyUp(key);
+
+        public bool KeysUp(params Keys[] keys) => keys.All(this.KeyUp);
+
+        public bool KeysUpAny(params Keys[] keys) => keys.Any(this.KeyUp);
+
         public bool MousePressed(MouseButton button) =>
             !this.LastMouseState.GetButtonState(button).IsPressed()
                 && this.CurrentMouseState.GetButtonState(button).IsPressed();

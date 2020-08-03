@@ -214,11 +214,15 @@ namespace Zo
                 switch (this.Map.GetMapType())
                 {
                     case MapType.Political:
+                        if (this.Input.KeysDownAny(Keys.LeftControl, Keys.RightControl))
+                            this.Map.AddFief(relativePosition);
+                        else
+                            this.Map.SelectFief(relativePosition);
                         break;
                     case MapType.Natural:
                         break;
                     case MapType.Geographical:
-                        this.Map.SelectGeographicalRegion(relativePosition);
+                        this.Map.SelectGeographicalRegion(relativePosition, combineRegions: this.Input.KeysDownAny(Keys.LeftControl, Keys.RightControl));
                         break;
                 }
             }
@@ -264,6 +268,9 @@ namespace Zo
             if (this.Input.KeyPressed(Keys.D0))
                 this.Map.RaiseDivision();
 
+            if (this.Input.KeysUp(Keys.LeftControl, Keys.RightControl) && this.Map.IsAddingFief)
+                this.Map.FinalizeFief();
+
             #endregion
 
             #region Reset
@@ -305,14 +312,27 @@ namespace Zo
             switch (this.Map.GetMapType())
             {
                 case MapType.Political:
-                    this.Map.GetGeographicalRegions()
-                        .Each(region => this.SpriteBatch.DrawAt(
-                                texture: region.OutlineTexture,
-                                position: (region.Position * actualMapScale) + this.Map.ActualPosition,
-                                color: new Color(50, 50, 50, 40),
-                                scale: actualMapScale,
-                                depth: 0.3f
-                            ));
+                    this.Map.GetFiefs()
+                        .Each(fief =>
+                        {
+                            this.SpriteBatch.DrawAt(
+                                   texture: fief.Region.CombinedTexture,
+                                   position: (fief.Region.Position * actualMapScale) + this.Map.ActualPosition,
+                                   color: fief.Color,
+                                   scale: actualMapScale,
+                                   depth: 0.3f
+                               );
+                            if (this.Map.VisibleLabel)
+                                this.DrawText(fief.Name, (fief.Region.Center * actualMapScale) + this.Map.ActualPosition, depth: 0.45f, center: true);
+                        });
+                    // this.Map.GetGeographicalRegions()
+                    //     .Each(region => this.SpriteBatch.DrawAt(
+                    //             texture: region.OutlineTexture,
+                    //             position: (region.Position * actualMapScale) + this.Map.ActualPosition,
+                    //             color: new Color(50, 50, 50, 40),
+                    //             scale: actualMapScale,
+                    //             depth: 0.3f
+                    //         ));
                     break;
                 case MapType.Natural:
                     if (this.Map.VisibleBorder)
@@ -386,16 +406,22 @@ namespace Zo
                 + $"Map Pos {this.Map.ActualPosition.PrintInt()}"
                 + Environment.NewLine
                 + $"Mouse Pos {relativeMouse.PrintInt()}"
+                + Environment.NewLine
+                + $"Mouse Map Pos {((this.Input.CurrentMouseState.ToVector2() - this.Map.ActualPosition) / this.Map.Scale / this.Platform.GlobalScale).PrintInt()}"
+                + Environment.NewLine
+                + $"Fiefs {this.Map.GetFiefCount()}"
                 // + $"View Center {this.Map.ViewCenter.PrintInt()}"
                 // + Environment.NewLine
                 // + $"Map Center {this.Map.ViewMapCenter.PrintInt()}"
                 // + Environment.NewLine
                 // + $"Border {this.Platform.Sizes.BorderSize}"
                 // + Environment.NewLine
-                + Environment.NewLine + this.Platform.Device.GraphicsDevice.DisplayMode.Width
-                + Environment.NewLine + this.Platform.Device.GraphicsDevice.DisplayMode.Height
-                + Environment.NewLine + this.Platform.Device.GraphicsDevice.DisplayMode.Width / (float) SizeManager.BASE_TOTAL_WIDTH
-                + Environment.NewLine + this.Platform.Device.GraphicsDevice.DisplayMode.Height / (float) SizeManager.BASE_TOTAL_HEIGHT
+                // + Environment.NewLine + this.Platform.Device.GraphicsDevice.DisplayMode.Width
+                // + Environment.NewLine + this.Platform.Device.GraphicsDevice.DisplayMode.Height
+                // + Environment.NewLine + this.Platform.Device.GraphicsDevice.DisplayMode.Width / (float) SizeManager.BASE_TOTAL_WIDTH
+                // + Environment.NewLine + this.Platform.Device.GraphicsDevice.DisplayMode.Height / (float) SizeManager.BASE_TOTAL_HEIGHT
+                // + Environment.NewLine + "keysup:" + this.Input.KeysUp(Keys.LeftControl, Keys.RightControl)
+                // + Environment.NewLine + "adding:" + this.Map.IsAddingFief
                 , this.Platform.Sizes.SideTextPosition);
 
             this.DrawText(this.Map.Debug,
@@ -403,13 +429,13 @@ namespace Zo
 
 
             // if (this.Map.LastSelectedRegion.HasValue)
-            if (this.Map.LastSelectedRegion != default)
-                this.DrawText($"Selected: {this.Map.LastSelectedRegion.Name}"
-                    + Environment.NewLine + $"id: {this.Map.LastSelectedRegion.Id}"
-                    + Environment.NewLine + $"rgba: {this.Map.LastSelectedRegion.Rgba}"
-                    + Environment.NewLine + $"position: {this.Map.LastSelectedRegion.Position.PrintInt()}"
-                    + Environment.NewLine + $"center: {this.Map.LastSelectedRegion.Center.PrintInt()}"
-                    + Environment.NewLine + $"size: {this.Map.LastSelectedRegion.Size}"
+            if (this.Map.LastSelection != default)
+                this.DrawText($"Selected: {this.Map.LastSelection.Name}"
+                    + Environment.NewLine + $"id: {this.Map.LastSelection.Id}"
+                    + Environment.NewLine + $"rgba: {this.Map.LastSelection.Rgba}"
+                    + Environment.NewLine + $"position: {this.Map.LastSelection.Position.PrintInt()}"
+                    + Environment.NewLine + $"center: {this.Map.LastSelection.Center.PrintInt()}"
+                    + Environment.NewLine + $"size: {this.Map.LastSelection.Size}"
                     // + Environment.NewLine + $"neighbours: {region.Neighbours.Length}"
                     , this.Platform.Sizes.SideTextPosition + new Vector2(0, this.Platform.Sizes.ActualMapHeight * 3 / 5));
 

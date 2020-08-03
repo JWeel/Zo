@@ -19,6 +19,11 @@ fiefs:
     region for root fief encompasses all regions of child fiefs + demesne (so demesne should be region also)
     fiefs should cover all g0/cells? uncontrolled g0/cells could be controlled by placeholder fief?
     new scenario class should contain fiefs in a prearranged manner, possibly taken from external data file (csv?)
+couple notes:
+    selecting only works based on division now, which is wrong
+    creating new now allows same part of world to be taken multiple times, which is wrong
+    displayed info should be based on fief properties
+--->find out why center is not center
 
 maybe region should be collection of cells but have its own texture for performance
 
