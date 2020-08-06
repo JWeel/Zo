@@ -77,7 +77,6 @@ namespace Zo.Data
         {
             var thisRectangle = this.GetBounds();
             var thatRectangle = region.GetBounds();
-
             if (!thisRectangle.Intersects(thatRectangle))
                 return false;
 
@@ -91,8 +90,10 @@ namespace Zo.Data
 
                 var otherX = x + (int) offset.X;
                 var otherY = y + (int) offset.Y;
+                if ((otherX < 0) || (otherX >= region.Texture.Width) 
+                    || (otherY < 0) || (otherY >= region.Texture.Height))
+                    continue;
                 var otherIndex = otherX + (otherY * region.Texture.Width);
-                if ((otherIndex < 0) || (otherIndex >= region.ColorsByPixelIndex.Length)) continue;
 
                 if (region.ColorsByPixelIndex[otherIndex] != default)
                     return true;

@@ -9,9 +9,10 @@ namespace Zo.Managers
     {
         #region Constants
 
+        // all  unused
         public const int BASE_LETTER_WIDTH = 6;
         public const int BASE_LETTER_X_DISTANCE = 2;
-        public const int BASE_LETTER_Y_DISTANCE = 10;
+        public const int BASE_LETTER_Y_DISTANCE = 12;
         public const int BASE_LETTER_HEIGHT = 8;
 
         #endregion

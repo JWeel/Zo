@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PipelineBuildEvent xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <SourceFile>D:/Documents/Code/zo/Zo/Content/Border/a4c.png</SourceFile>
+  <SourceFile>d:/Documents/Code/zo/Zo/Content/Border/a4c.png</SourceFile>
   <SourceTime>2020-06-15T20:10:01.4226269-04:00</SourceTime>
-  <DestFile>D:/Documents/Code/zo/Zo/Content/bin/Border/a4c.xnb</DestFile>
-  <DestTime>2020-06-15T20:10:37.9202309-04:00</DestTime>
+  <DestFile>d:/Documents/Code/zo/Zo/Content/bin/Border/a4c.xnb</DestFile>
+  <DestTime>2020-08-06T10:12:43.7164254-04:00</DestTime>
   <Importer>TextureImporter</Importer>
   <ImporterTime>2017-03-01T10:05:36-05:00</ImporterTime>
   <Processor>TextureProcessor</Processor>

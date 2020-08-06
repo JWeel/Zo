@@ -21,5 +21,3 @@ load regions async
 deselect should be regardless of maptype
 
 if fief is disconnected, have multiple regions?
-
-add selection for fiefs

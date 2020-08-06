@@ -4,22 +4,22 @@
   <Platform>Windows</Platform>
   <Config />
   <SourceFiles>
-    <File>D:/Documents/Code/zo/Zo/Content/Land/background.png</File>
-    <File>D:/Documents/Code/zo/Zo/Content/Area/a0.png</File>
-    <File>D:/Documents/Code/zo/Zo/Content/Area/a1.png</File>
-    <File>D:/Documents/Code/zo/Zo/Content/Area/a2.png</File>
-    <File>D:/Documents/Code/zo/Zo/Content/Area/a3.png</File>
-    <File>D:/Documents/Code/zo/Zo/Content/Area/a4.png</File>
-    <File>D:/Documents/Code/zo/Zo/Content/Area/a5.png</File>
-    <File>D:/Documents/Code/zo/Zo/Content/Area/a6.png</File>
-    <File>D:/Documents/Code/zo/Zo/Content/Border/a0c.png</File>
-    <File>D:/Documents/Code/zo/Zo/Content/Border/a1c.png</File>
-    <File>D:/Documents/Code/zo/Zo/Content/Border/a2c.png</File>
-    <File>D:/Documents/Code/zo/Zo/Content/Border/a3c.png</File>
-    <File>D:/Documents/Code/zo/Zo/Content/Border/a4c.png</File>
-    <File>D:/Documents/Code/zo/Zo/Content/Border/a5c.png</File>
-    <File>D:/Documents/Code/zo/Zo/Content/Border/a6c.png</File>
-    <File>D:/Documents/Code/zo/Zo/Content/Border/outer.png</File>
-    <File>D:/Documents/Code/zo/Zo/Content/Alphabet/alphabet.spritefont</File>
+    <File>d:/Documents/Code/zo/Zo/Content/Land/background.png</File>
+    <File>d:/Documents/Code/zo/Zo/Content/Area/a0.png</File>
+    <File>d:/Documents/Code/zo/Zo/Content/Area/a1.png</File>
+    <File>d:/Documents/Code/zo/Zo/Content/Area/a2.png</File>
+    <File>d:/Documents/Code/zo/Zo/Content/Area/a3.png</File>
+    <File>d:/Documents/Code/zo/Zo/Content/Area/a4.png</File>
+    <File>d:/Documents/Code/zo/Zo/Content/Area/a5.png</File>
+    <File>d:/Documents/Code/zo/Zo/Content/Area/a6.png</File>
+    <File>d:/Documents/Code/zo/Zo/Content/Border/a0c.png</File>
+    <File>d:/Documents/Code/zo/Zo/Content/Border/a1c.png</File>
+    <File>d:/Documents/Code/zo/Zo/Content/Border/a2c.png</File>
+    <File>d:/Documents/Code/zo/Zo/Content/Border/a3c.png</File>
+    <File>d:/Documents/Code/zo/Zo/Content/Border/a4c.png</File>
+    <File>d:/Documents/Code/zo/Zo/Content/Border/a5c.png</File>
+    <File>d:/Documents/Code/zo/Zo/Content/Border/a6c.png</File>
+    <File>d:/Documents/Code/zo/Zo/Content/Border/outer.png</File>
+    <File>d:/Documents/Code/zo/Zo/Content/Alphabet/alphabet.spritefont</File>
   </SourceFiles>
 </SourceFileCollection>

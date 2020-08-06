@@ -431,7 +431,7 @@ namespace Zo
                     + Environment.NewLine + $"center: {this.Map.LastSelection.Center.PrintInt()}"
                     + Environment.NewLine + $"size: {this.Map.LastSelection.Size}"
                     // + Environment.NewLine + $"neighbours: {region.Neighbours.Length}"
-                    , this.Platform.Sizes.SideTextPosition + new Vector2(0, this.Platform.Sizes.ActualMapHeight * 3 / 5));
+                    , this.Platform.Sizes.SideTextPosition + new Vector2(0, this.Platform.Sizes.ActualMapHeight * 52 / 100));
 
 
             this.DrawText($"Map Type: {this.Map.GetMapType()}",
@@ -481,7 +481,7 @@ namespace Zo
                 return;
             color.DefaultTo(Color.LightGoldenrodYellow);
             depth.DefaultTo(0.9f);
-            scale.DefaultTo(1f);
+            scale.DefaultTo(this.Platform.GlobalScale);
 
             if (center)
                 position -= new Vector2(this.Text.CharacterSize.X * text.Length / 2f, 0f);
