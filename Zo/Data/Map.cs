@@ -285,7 +285,7 @@ namespace Zo.Data
             return outlineColors1D;
         }
 
-        public Region CombineRegions(string name, Rgba rgba, IEnumerable<Region> regions)
+        public Region CreateRegionByCombining(string name, Rgba rgba, IEnumerable<Region> regions)
         {
             var id = "n/a";
             var (position, center, width, height, colorsByPixelIndex, outlineColorsByPixelIndex) = this.MergeTextures(regions);
@@ -298,23 +298,24 @@ namespace Zo.Data
             return new Region(id, name, rgba, position, center, colorsByPixelIndex, texture, outlineTexture, combinedTexture);
         }
 
-        public Region DisjoinRegions(string name, Rgba rgba, Region exclusionRegion, Region sourceRegion)
+        public Region CreateRegionBySplitting(string name, Rgba rgba, Region exclusionRegion, Region sourceRegion)
         {
             var id = "n/a";
-            var colorsByPixelIndex = this.GetColorsByPixelIndexWithoutRegion(sourceRegion, exclusionRegion);
-            var outlineColorsByPixelIndex = this.CalculateTextureOutline(colorsByPixelIndex, sourceRegion.Texture.Width, sourceRegion.Texture.Height);
+            var (width, height, position, center, colorsByPixelIndex) = this.GetSplitRegionData(sourceRegion, exclusionRegion);
+            if (colorsByPixelIndex.All(color => (color == default)))
+                return new Region(id, name, rgba, position, center, colorsByPixelIndex, default, default, default);
+            
+            var outlineColorsByPixelIndex = this.CalculateTextureOutline(colorsByPixelIndex, width, height);
             var combinedColorsByPixelIndex = this.CombineOutline(colorsByPixelIndex, outlineColorsByPixelIndex);
-            var position = sourceRegion.Position;
-            var center = sourceRegion.Center;
 
-            var texture = this.Texture.Create(sourceRegion.Texture.Width, sourceRegion.Texture.Height).WithSetData(colorsByPixelIndex);
-            var outlineTexture = this.Texture.Create(sourceRegion.Texture.Width, sourceRegion.Texture.Height).WithSetData(outlineColorsByPixelIndex);
-            var combinedTexture = this.Texture.Create(sourceRegion.Texture.Width, sourceRegion.Texture.Height).WithSetData(combinedColorsByPixelIndex);
+            var texture = this.Texture.Create(width, height).WithSetData(colorsByPixelIndex);
+            var outlineTexture = this.Texture.Create(width, height).WithSetData(outlineColorsByPixelIndex);
+            var combinedTexture = this.Texture.Create(width, height).WithSetData(combinedColorsByPixelIndex);
 
             return new Region(id, name, rgba, position, center, colorsByPixelIndex, texture, outlineTexture, combinedTexture);
         }
 
-        protected (Vector2 Position, Vector2 Center, int Width, int Height, Color[] TextureData, Color[] OutlineData) MergeTextures(IEnumerable<Region> regionEnumerable)
+        protected (Vector2 Position, Vector2 Center, int Width, int Height, Color[] ColorsByPixelIndex, Color[] OutlineColorsByPixelIndex) MergeTextures(IEnumerable<Region> regionEnumerable)
         {
             var regions = regionEnumerable.ToArray();
             var (maxX, maxY, minX, minY, sumX, sumY) = this.CalculateRequiredTextureSize(regions);
@@ -322,21 +323,17 @@ namespace Zo.Data
             var width = maxX - minX;
             var height = maxY - minY;
             var position = new Vector2(minX, minY);
-            var center = new Vector2(sumX / regions.Length, sumY / regions.Length);
 
             var colorsByPixelIndex = this.MergeTexturesIntoColorArray(regions, width, height, position);
-            var outlineColors1D = this.CalculateTextureOutline(colorsByPixelIndex, width, height);
+            var outlineColorsByPixelIndex = this.CalculateTextureOutline(colorsByPixelIndex, width, height);
 
-            return (position, center, width, height, colorsByPixelIndex, outlineColors1D);
+            var center = new Vector2(maxX + minX, maxY + minY) / 2;
+
+            return (position, center, width, height, colorsByPixelIndex, outlineColorsByPixelIndex);
         }
 
         protected (int MaxX, int MaxY, int MinX, int MinY, int SumX, int SumY) CalculateRequiredTextureSize(Region[] regions)
         {
-            int Smallest(int left, float right) =>
-                (left > right) ? (int) right : left;
-            int Largest(int left, float right) =>
-                (left < right) ? (int) right : left;
-
             return regions
                 .Select(region => (region.Position, region.Texture.Width, region.Texture.Height))
                 .Aggregate((MaxX: 0, MaxY: 0, MinX: int.MaxValue, MinY: int.MaxValue, SumX: 0, SumY: 0), (aggregate, value) =>
@@ -349,22 +346,22 @@ namespace Zo.Data
         {
             var colorsByPixelIndex = new Color[width * height];
             var regionInfo = regions
-                .Select(region => (Offset: (region.Position - position), region.Texture.Width, region.Texture.Height, Colors1D: region.ColorsByPixelIndex))
+                .Select(region => (Offset: (region.Position - position), region.Texture.Width, region.Texture.Height, ColorsByPixelIndex: region.ColorsByPixelIndex))
                 .ToArray();
             for (int index = 0; index < colorsByPixelIndex.Length; index++)
             {
                 var x = index % width;
                 var y = index / width;
-                foreach (var region in regionInfo)
+                foreach (var info in regionInfo)
                 {
-                    var regionX = x - (int) region.Offset.X;
-                    var regionY = y - (int) region.Offset.Y;
+                    var regionX = x - (int) info.Offset.X;
+                    var regionY = y - (int) info.Offset.Y;
                     if (regionX < 0) continue;
-                    if (regionX >= region.Width) continue;
+                    if (regionX >= info.Width) continue;
                     if (regionY < 0) continue;
-                    if (regionY >= region.Height) continue;
-                    var regionIndex = regionX + (regionY * region.Width);
-                    var regionColor = region.Colors1D[regionIndex];
+                    if (regionY >= info.Height) continue;
+                    var regionIndex = regionX + (regionY * info.Width);
+                    var regionColor = info.ColorsByPixelIndex[regionIndex];
                     if (regionColor == default) continue;
                     colorsByPixelIndex[index] = Color.White;
                 }
@@ -423,28 +420,73 @@ namespace Zo.Data
             return outlineColors1D;
         }
 
-        protected Color[] GetColorsByPixelIndexWithoutRegion(Region sourceRegion, Region exclusionRegion)
+        protected (int Width, int Height, Vector2 Position, Vector2 Center, Color[] ColorsByPixelIndex) GetSplitRegionData(Region sourceRegion, Region regionToSplit)
         {
-            var withoutColorsByPixelIndex = new Color[sourceRegion.ColorsByPixelIndex.Length];
-            sourceRegion.ColorsByPixelIndex.CopyTo(withoutColorsByPixelIndex, index: 0);
+            var splitColorsByPixelIndex = new Color[sourceRegion.ColorsByPixelIndex.Length];
+            sourceRegion.ColorsByPixelIndex.CopyTo(splitColorsByPixelIndex, index: 0);
 
-            var relativePosition = sourceRegion.Position - exclusionRegion.Position;
-            for (int index = 0; index < exclusionRegion.ColorsByPixelIndex.Length; index++)
+            var relativePosition = sourceRegion.Position - regionToSplit.Position;
+            for (int index = 0; index < regionToSplit.ColorsByPixelIndex.Length; index++)
             {
-                if (exclusionRegion.ColorsByPixelIndex[index] != default)
+                if (regionToSplit.ColorsByPixelIndex[index] != default)
                 {
-                    var x = index % exclusionRegion.Texture.Width;
-                    var y = index / exclusionRegion.Texture.Width;
+                    var x = index % regionToSplit.Texture.Width;
+                    var y = index / regionToSplit.Texture.Width;
                     var position = new Vector2(x, y);
                     var positionOnSource = position - relativePosition;
                     if (!positionOnSource.LiesWithin(sourceRegion.Texture.Width, sourceRegion.Texture.Height)) continue;
 
                     var sourceIndex = (int) positionOnSource.X + (int) positionOnSource.Y * sourceRegion.Texture.Width;
-                    withoutColorsByPixelIndex[sourceIndex] = default;
+                    splitColorsByPixelIndex[sourceIndex] = default;
                 }
             }
-            return withoutColorsByPixelIndex;
+
+            var (minX, maxX, minY, maxY) = splitColorsByPixelIndex
+                .In2D(sourceRegion.Texture.Width)
+                .Aggregate((MinX: int.MaxValue, MaxX: 0, MinY: int.MaxValue, MaxY: 0),
+                    (aggregate, i) => ((i.Value == default) ? aggregate :
+                        (
+                            MinX: Smallest(aggregate.MinX, i.Position.X),
+                            MaxX: Largest(aggregate.MaxX, i.Position.X),
+                            MinY: Smallest(aggregate.MinY, i.Position.Y),
+                            MaxY: Largest(aggregate.MaxY, i.Position.Y)))
+                        );
+
+            var filteredWidth = maxX - minX + 1;
+            var filteredHeight = maxY - minY + 1;
+            var filteredPosition = sourceRegion.Position + new Vector2(minX, minY);
+            var filteredCenter = new Vector2(sourceRegion.Position.X + maxX + sourceRegion.Position.X + minX, sourceRegion.Position.Y + maxY + sourceRegion.Position.Y + minY) / 2;
+            var filteredColorsByPixelIndex = new Color[filteredWidth * filteredHeight];
+            for (int index = 0; index < filteredColorsByPixelIndex.Length; index++)
+            {
+                var x = index % filteredWidth;
+                var y = index / filteredWidth;
+
+                var regionX = x + minX;
+                var regionY = y + minY;
+                if (regionX < 0)
+                    continue;
+                if (regionX >= sourceRegion.Texture.Width)
+                    continue;
+                if (regionY < 0)
+                    continue;
+                if (regionY >= sourceRegion.Texture.Height)
+                    continue;
+
+                var regionIndex = regionX + (regionY * sourceRegion.Texture.Width);
+                var regionColor = splitColorsByPixelIndex[regionIndex];
+                if (regionColor == default) continue;
+
+                filteredColorsByPixelIndex[index] = Color.White;
+            }
+
+            return (filteredWidth, filteredHeight, filteredPosition, filteredCenter, filteredColorsByPixelIndex);
         }
+
+        int Smallest(int left, float right) =>
+            (left > right) ? (int) right : left;
+        int Largest(int left, float right) =>
+            (left < right) ? (int) right : left;
 
         #endregion
     }

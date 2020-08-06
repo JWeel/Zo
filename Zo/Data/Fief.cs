@@ -8,16 +8,14 @@ namespace Zo.Data
     {
         #region Constructors
 
-        public Fief(string name, Region region)
+        public Fief(string name, Rgba rgba, Region region)
         {
             this.Name = name;
             this.Region = region;
+            this.Rgba = rgba;
+            this.Color = (Color) rgba;
+            
             this.Cells = new List<Cell>();
-
-            var random = new Random();
-            var randomRgba = new Rgba((uint) random.Next(35, 230), (uint) random.Next(35, 230), (uint) random.Next(35, 230), 235u);
-            this.Rgba = randomRgba;
-            this.Color = (Color) randomRgba;
         }
 
         #endregion

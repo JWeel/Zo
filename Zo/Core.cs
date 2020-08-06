@@ -69,7 +69,7 @@ namespace Zo
             this.Map = new MapManager(this.Platform.Sizes, this.Texture, subscription => this.OnUpdate += subscription);
             this.Animation = new AnimationManager(subscription => this.OnUpdate += subscription, subscription => this.Map.OnSelected += subscription);// this.Map.SubscribeToSelect);
 
-            this.Frame = new FrameManager(this, this.Platform.Sizes.BorderSizeVector, Color.White, Color.Black);
+            this.Frame = new FrameManager(this, this.Platform.Sizes.BorderSizeVector);
 
             // if GameWindow.AllowUserResizing is set in our ctor, 
             //      1 the GameWindow.ClientSizeChanged event gets raised
@@ -214,10 +214,7 @@ namespace Zo
                 switch (this.Map.GetMapType())
                 {
                     case MapType.Political:
-                        if (this.Input.KeysDownAny(Keys.LeftControl, Keys.RightControl))
-                            this.Map.AddFief(relativePosition);
-                        else
-                            this.Map.SelectFief(relativePosition);
+                        this.Map.SelectFief(relativePosition, modifying: this.Input.KeysDownAny(Keys.LeftControl, Keys.RightControl));
                         break;
                     case MapType.Natural:
                         break;
@@ -267,9 +264,6 @@ namespace Zo
                 this.Map.LowerDivision();
             if (this.Input.KeyPressed(Keys.D0))
                 this.Map.RaiseDivision();
-
-            if (this.Input.KeysUp(Keys.LeftControl, Keys.RightControl) && this.Map.IsAddingFief)
-                this.Map.FinalizeFief();
 
             #endregion
 
@@ -421,7 +415,7 @@ namespace Zo
                 // + Environment.NewLine + this.Platform.Device.GraphicsDevice.DisplayMode.Width / (float) SizeManager.BASE_TOTAL_WIDTH
                 // + Environment.NewLine + this.Platform.Device.GraphicsDevice.DisplayMode.Height / (float) SizeManager.BASE_TOTAL_HEIGHT
                 // + Environment.NewLine + "keysup:" + this.Input.KeysUp(Keys.LeftControl, Keys.RightControl)
-                // + Environment.NewLine + "adding:" + this.Map.IsAddingFief
+                + Environment.NewLine + "selected: " + this.Map.SelectedFief?.Name
                 , this.Platform.Sizes.SideTextPosition);
 
             this.DrawText(this.Map.Debug,

@@ -73,6 +73,36 @@ namespace Zo.Data
             position.LiesWithin(this.Position, this.Texture.Width, this.Texture.Height) &&
                 (this.ColorsByPixelIndex.Item(position - this.Position, this.Texture.Width) != default);
 
+        public bool Contains(Region region)
+        {
+            var thisRectangle = this.GetBounds();
+            var thatRectangle = region.GetBounds();
+
+            if (!thisRectangle.Intersects(thatRectangle))
+                return false;
+
+            var offset = this.Position - region.Position;
+            for (var index = 0; index < this.ColorsByPixelIndex.Length; index++)
+            {
+                if (this.ColorsByPixelIndex[index] == default) continue;
+
+                var x = index % this.Texture.Width;
+                var y = index / this.Texture.Width;
+
+                var otherX = x + (int) offset.X;
+                var otherY = y + (int) offset.Y;
+                var otherIndex = otherX + (otherY * region.Texture.Width);
+                if ((otherIndex < 0) || (otherIndex >= region.ColorsByPixelIndex.Length)) continue;
+
+                if (region.ColorsByPixelIndex[otherIndex] != default)
+                    return true;
+            }
+            return false;
+        }
+
+        protected Rectangle GetBounds() =>
+            new Rectangle((int) this.Position.X, (int) this.Position.Y, this.Texture.Width, this.Texture.Height);
+
         #endregion
     }
 }

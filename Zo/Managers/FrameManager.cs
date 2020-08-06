@@ -7,25 +7,24 @@ namespace Zo.Managers
 {
     public class FrameManager : DrawableGameComponent
     {
-        public Vector2 Position { get; set; }
-        public Vector2 Position2 { get; set; }
-        public Color Color { get; set; }
-        public Color Color2 { get; set; }
+        protected Vector2 Position { get; }
+        protected Vector2 Position2 { get; }
 
         protected SpriteBatch SpriteBatch { get; set; }
         protected SpriteFont Font { get; set; }
 
-        protected int FrameRate { get; set; } = 0;
-        protected int FrameCounter { get; set; } = 0;
-        protected TimeSpan ElapsedTime { get; set; } = TimeSpan.Zero;
+        protected int FrameRate { get; set; }
+        protected int FrameCounter { get; set; } 
+        protected TimeSpan ElapsedTime { get; set; }
 
-        public FrameManager(Game game, Vector2 position, Color color, Color color2)
+        public FrameManager(Game game, Vector2 position)
             : base(game)
         {
             this.Position = position;
             this.Position2 = new Vector2(Position.X + 1, Position.Y + 1);
-            this.Color = color;
-            this.Color2 = color2;
+            this.FrameRate = 0;
+            this.FrameCounter = 0;
+            this.ElapsedTime = TimeSpan.Zero;
         }
 
         public void LoadContent(ContentManager content)
@@ -53,8 +52,8 @@ namespace Zo.Managers
             string text = this.FrameRate.ToString();
 
             this.SpriteBatch.Begin();
-            this.SpriteBatch.DrawString(this.Font, text, this.Position2, this.Color2);
-            this.SpriteBatch.DrawString(this.Font, text, this.Position, this.Color);
+            this.SpriteBatch.DrawString(this.Font, text, this.Position2, Color.Black);
+            this.SpriteBatch.DrawString(this.Font, text, this.Position, Color.White);
             this.SpriteBatch.End();
         }
     }

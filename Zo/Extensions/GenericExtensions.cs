@@ -287,5 +287,12 @@ namespace Zo.Extensions
             dictionary[key];
 
         #endregion
+
+        #region
+
+        public static bool HasValue<T>(this T value) where T : class => 
+            (value != null);
+
+        #endregion
     }
 }

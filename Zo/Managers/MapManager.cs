@@ -1,5 +1,3 @@
-using System.Xml.Linq;
-using System.Runtime.CompilerServices;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using System;
@@ -17,7 +15,7 @@ namespace Zo.Managers
     {
         #region Constants
 
-        public const float MAX_MAP_ZOOM = 5f;
+        public const float MAX_MAP_ZOOM = 6f;
         public const float MIN_MAP_ZOOM = 1f;
         public const float BASE_MAP_ZOOM = 1.5f;
         public const float BASE_ZOOM_IN_AMOUNT = 0.25f;
@@ -216,14 +214,14 @@ namespace Zo.Managers
                             .In2D(this.SelectedRegion.Texture.Width)
                             .Any(tuple => (tuple.Position == relativePosition) && (tuple.Value != default)))
                     {
-                        var withRemovedRegion = this.Map.DisjoinRegions(mappedRegion.Name, mappedRegion.Rgba, mappedRegion, this.SelectedRegion);
-                        if (withRemovedRegion.Size == 0)
-                            this.SelectedRegion = default; // not strictly necessary but makes texture smaller
+                        var splitRegion = this.Map.CreateRegionBySplitting(mappedRegion.Name, mappedRegion.Rgba, mappedRegion, this.SelectedRegion);
+                        if (splitRegion.Size == 0)
+                            this.SelectedRegion = default; // not strictly necessary?
                         else
-                            this.SelectedRegion = withRemovedRegion;
+                            this.SelectedRegion = splitRegion;
                     }
                     else
-                        this.SelectedRegion = this.Map.CombineRegions(mappedRegion.Name, mappedRegion.Rgba, mappedRegion.YieldWith(this.SelectedRegion));
+                        this.SelectedRegion = this.Map.CreateRegionByCombining(mappedRegion.Name, mappedRegion.Rgba, mappedRegion.YieldWith(this.SelectedRegion));
                 }
             }
             else
@@ -252,70 +250,77 @@ namespace Zo.Managers
         public Region[] GetGeographicalRegions() =>
             this.Map.GeographicalRegions[this.Division.Index].Regions;
 
-        // bad
-        public Region[] GetGeographicalRegions(int index) =>
-            this.Map.GeographicalRegions[index].Regions;
-
-        public void SelectFief(Vector2 position)
+        public void SelectFief(Vector2 position, bool modifying)
         {
-            this.LastSelection = default;
-            this.SelectedFief = default;
-            var regionMapper = this.Map.GeographicalRegions[this.Division.Index];
-            var rgba = regionMapper.RgbaByPixelPosition.Item(position);
-            if (rgba != default)
+            if (modifying)
             {
-                var mappedFief = this.Map.Fiefs.FirstOrDefault(fief => fief.Region.Contains(position));
-                if ((this.SelectedFief == default) && (mappedFief != default))
+                var regionMapper = this.Map.GeographicalRegions[this.Division.Index];
+                var rgba = regionMapper.RgbaByPixelPosition.Item(position);
+                if (rgba == default)
+                {
+                    this.SelectedFief = default;
+                    this.LastSelection = default;
+                }
+                else
+                {
+                    var mappedRegion = regionMapper.RegionByRgba[rgba];
+
+                    this.Map.Fiefs
+                        .Where(fief => (fief != this.SelectedFief))
+                        .Where(fief => mappedRegion.Contains(fief.Region))
+                        .Each(fief => this.Map.CreateRegionBySplitting(fief.Name, fief.Rgba, mappedRegion, fief.Region)
+                            .Into(fief.UpdateRegion));
+                    this.Map.Fiefs.RemoveAll(fief => (fief.Region.Size == 0));
+
+                    if (!this.SelectedFief.HasValue())
+                    {
+                        var fiefName = $"f-{this.FiefCounter++}";
+                        var random = new Random();
+                        var fiefRgba = new Rgba((uint) random.Next(35, 230), (uint) random.Next(35, 230), (uint) random.Next(35, 230), 235u);
+                        var fiefRegion = new Region(id: "n/a", fiefName, fiefRgba,
+                            mappedRegion.Position, mappedRegion.Center, mappedRegion.ColorsByPixelIndex,
+                            mappedRegion.Texture, mappedRegion.OutlineTexture, mappedRegion.CombinedTexture);
+
+                        var fief = new Fief(fiefName, fiefRgba, fiefRegion);
+                        this.Map.Fiefs.Add(fief);
+                        this.SelectedFief = fief;
+                    }
+                    else
+                    {
+                        var newRegion = this.Map.CreateRegionByCombining(this.SelectedFief.Name, this.SelectedFief.Rgba, this.SelectedFief.Region.YieldWith(mappedRegion));
+                        this.SelectedFief.UpdateRegion(newRegion);
+
+                        // if (this.SelectedRegion.HasValue())
+                        //     this.SelectedRegion = this.SelectedFief.Region;
+                        // if (this.LastSelection.HasValue())
+                        //     this.LastSelection = this.SelectedFief.Region;
+                    }
+                    this.SelectedRegion = this.SelectedFief.Region;
+                    this.LastSelection = this.SelectedFief.Region;
+                }
+            }
+            else
+            {
+                var mappedFief = this.Map.Fiefs.SingleOrDefault(fief => fief.Region.Contains(position));
+                if (mappedFief == default)
+                {
+                    this.SelectedFief = default;
+                    this.SelectedRegion = default;
+                    this.LastSelection = default;
+                }
+                else
                 {
                     this.LastSelection = mappedFief.Region;
+                    this.SelectedRegion = mappedFief.Region;
                     this.SelectedFief = mappedFief;
                 }
             }
+
             this.OnSelected?.Invoke();
         }
 
         public int GetFiefCount() => this.Map.Fiefs.Count;
         protected int FiefCounter = 0;
-        public bool IsAddingFief { get; protected set; }
-        public void AddFief(Vector2 position)
-        {
-            var regionMapper = this.Map.GeographicalRegions[this.Division.Index];
-            var rgba = regionMapper.RgbaByPixelPosition.Item(position);
-            if (rgba == default)
-                return;
-
-            var mappedRegion = regionMapper.RegionByRgba[rgba];
-            this.Map.Fiefs
-                .Where(fief => this.SelectedFief != fief || !this.IsAddingFief)
-                .Where(fief => fief.Region.Contains(position))
-                .Each(fief => this.Map.DisjoinRegions(fief.Name, fief.Rgba, mappedRegion, fief.Region)
-                    .Into(fief.UpdateRegion));
-            this.Map.Fiefs.RemoveAll(fief => (fief.Region.Size == 0) && (fief != this.SelectedFief));
-
-            if (this.IsAddingFief)
-            {
-                if (this.SelectedFief.Region.Contains(position))
-                {
-                    Console.WriteLine("Fief contains region.");
-                    return;
-                }
-
-                var newRegion = this.Map.CombineRegions(this.SelectedFief.Name, this.SelectedFief.Rgba, this.SelectedFief.Region.YieldWith(mappedRegion));
-                this.SelectedFief.UpdateRegion(newRegion);
-            }
-            else
-            {
-                var fief = new Fief($"f-{this.FiefCounter++}", mappedRegion);
-                this.Map.Fiefs.Add(fief);
-                this.SelectedFief = fief;
-                this.IsAddingFief = true;
-            }
-        }
-
-        public void FinalizeFief()
-        {
-            this.IsAddingFief = false;
-        }
 
         public IEnumerable<Fief> GetFiefs() =>
             this.Map.Fiefs;
