@@ -41,6 +41,11 @@ namespace Zo.Data
             this.Region = region;
         }
 
+        public void UpdateName(string name)
+        {
+            this.Name = name;
+        }
+
         #endregion
     }
 }

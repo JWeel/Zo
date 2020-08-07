@@ -29,4 +29,10 @@ namespace Zo.Enums
         Natural,
         Geographical,
     }
+
+    public enum InputSource
+    {
+        None,
+        FiefName
+    }
 }

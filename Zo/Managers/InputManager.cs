@@ -1,5 +1,7 @@
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Zo.Enums;
 using Zo.Extensions;
@@ -10,14 +12,17 @@ namespace Zo.Managers
     {
         #region Constructors
 
-        public InputManager(SizeManager sizes, Action<Action> subscribeToUpdate)
+        public InputManager(SizeManager sizes, Action<Action<GameTime>> subscribeToUpdate)
         {
             subscribeToUpdate(this.UpdateState);
+            this.TypedCharacters = new List<char>();
         }
 
         #endregion
 
         #region Properties
+
+        protected SizeManager Sizes { get; }
 
         protected KeyboardState LastKeyboardState { get; set; }
 
@@ -26,6 +31,10 @@ namespace Zo.Managers
         protected MouseState LastMouseState { get; set; }
 
         public MouseState CurrentMouseState { get; protected set; }
+
+        public bool TypingEnabled { get; set; }
+
+        public List<char> TypedCharacters { get; protected set; }
 
         #endregion
 
@@ -72,7 +81,7 @@ namespace Zo.Managers
 
         #region Protected Methods
 
-        protected void UpdateState()
+        protected void UpdateState(GameTime gameTime)
         {
             this.LastKeyboardState = this.CurrentKeyboardState;
             this.CurrentKeyboardState = Keyboard.GetState();

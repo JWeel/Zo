@@ -19,7 +19,7 @@ namespace Zo.Managers
 
         #region Constructors
 
-        public TextManager(SizeManager sizes, Action<Action> subscribeToUpdate)
+        public TextManager(SizeManager sizes, Action<Action<GameTime>> subscribeToUpdate)
         {
             subscribeToUpdate(this.UpdateState);
         }
@@ -58,7 +58,7 @@ namespace Zo.Managers
 
         #region Protected Methods
 
-        protected void UpdateState()
+        protected void UpdateState(GameTime gameTime)
         {
         }
 

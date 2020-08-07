@@ -1,5 +1,6 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Zo.Managers;
 
 namespace Zo.Extensions
 {
@@ -37,6 +38,17 @@ namespace Zo.Extensions
                 effects: SpriteEffects.None,
                 layerDepth: depth
             );
+
+        public static void DrawText(this SpriteBatch spriteBatch, SpriteFont font, string text, Vector2 position, Color color, float scale, float depth)
+        {
+            var shadePosition = position + new Vector2(1);
+            var shadeDepth = depth - 0.01f;
+
+            spriteBatch.DrawString(font, text, shadePosition, Color.Black,
+                rotation: 0f, origin: default, scale, SpriteEffects.None, shadeDepth);
+            spriteBatch.DrawString(font, text, position, color,
+                rotation: 0f, origin: default, scale, SpriteEffects.None, depth);
+        }
 
         #endregion
     }

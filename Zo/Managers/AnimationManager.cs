@@ -19,7 +19,7 @@ namespace Zo.Managers
 
         #region Constructors
 
-        public AnimationManager(Action<Action> subscribeToUpdate, Action<Action> subscribeToSelect)
+        public AnimationManager(Action<Action<GameTime>> subscribeToUpdate, Action<Action> subscribeToSelect)
         {
             subscribeToUpdate(this.HandleOnUpdate);
             subscribeToSelect(this.HandleOnSelect);
@@ -39,7 +39,7 @@ namespace Zo.Managers
 
         #region Protected Methods
 
-        protected void HandleOnUpdate()
+        protected void HandleOnUpdate(GameTime gameTime)
         {
         }
 

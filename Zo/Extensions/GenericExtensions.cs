@@ -282,16 +282,27 @@ namespace Zo.Extensions
         #endregion
 
         #region As Key
-        
+
         public static TValue AsKey<TKey, TValue>(this TKey key, IReadOnlyDictionary<TKey, TValue> dictionary) =>
             dictionary[key];
 
         #endregion
 
-        #region
+        #region Has Value
 
-        public static bool HasValue<T>(this T value) where T : class => 
+        public static bool HasValue<T>(this T value) where T : class =>
             (value != null);
+
+        #endregion
+
+        #region Remove Last
+
+        public static void RemoveLast<T>(this IList<T> source)
+        {
+            if (source.Count == 0)
+                return;
+            source.RemoveAt(source.Count - 1);
+        }
 
         #endregion
     }

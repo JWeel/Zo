@@ -35,7 +35,9 @@ namespace Zo
 
         #region Data Members
 
-        protected event Action OnUpdate;
+        protected event Action<GameTime> OnUpdate;
+
+        protected event Action<SpriteBatch> OnDraw;
 
         protected PlatformManager Platform { get; set; }
 
@@ -58,6 +60,11 @@ namespace Zo
 
         protected FrameManager Frame { get; set; }
 
+        protected InputSource InputSource { get; set; }
+
+        // yuck
+        protected bool RecentlyFinishedTyping { get; set; }
+
         #endregion
 
         #region Overriden Methods
@@ -69,7 +76,7 @@ namespace Zo
             this.Map = new MapManager(this.Platform.Sizes, this.Texture, subscription => this.OnUpdate += subscription);
             this.Animation = new AnimationManager(subscription => this.OnUpdate += subscription, subscription => this.Map.OnSelected += subscription);// this.Map.SubscribeToSelect);
 
-            this.Frame = new FrameManager(this, this.Platform.Sizes.BorderSizeVector);
+            this.Frame = new FrameManager(this.Platform.Sizes, subscription => this.OnUpdate += subscription, subscription => this.OnDraw += subscription);
 
             // if GameWindow.AllowUserResizing is set in our ctor, 
             //      1 the GameWindow.ClientSizeChanged event gets raised
@@ -79,6 +86,8 @@ namespace Zo
             this.Window.AllowUserResizing = true;
             this.Window.IsBorderless = true;
             this.Window.ClientSizeChanged += this.OnWindowResize;
+
+            this.Window.TextInput += this.OnTyping;
 
             base.Initialize(); // sets up this.GraphicsDevice and calls this.LoadContent
         }
@@ -104,8 +113,7 @@ namespace Zo
                 this.Exit();
 
             // call subscribing managers
-            this.OnUpdate?.Invoke();
-            this.Frame.Update(gameTime);
+            this.OnUpdate?.Invoke(gameTime);
 
             #region Full Screen
 
@@ -122,7 +130,7 @@ namespace Zo
             #region Rescale Window By Keyboard
 
             // do we even want this
-            if (!this.Platform.Device.IsFullScreen)
+            if (!this.Platform.Device.IsFullScreen && !this.Input.TypingEnabled)
             {
                 if (this.Input.KeyPressed(Keys.OemPeriod))
                     this.Platform.AddToGlobalScaleAndRescaleWindow(.25f);
@@ -165,17 +173,20 @@ namespace Zo
                 this.Map.Zoom(this.Input.MouseScrolledUp() ? MapManager.BASE_ZOOM_IN_AMOUNT : MapManager.BASE_ZOOM_OUT_AMOUNT,
                     zoomOrigin: this.Input.CurrentMouseState.ToVector2());
 
-            if (this.Input.KeyPressed(Keys.OemCloseBrackets))
-                this.Map.Zoom(MapManager.BASE_ZOOM_IN_AMOUNT, zoomOrigin: this.Input.CurrentMouseState.ToVector2());
+            if (!this.Input.TypingEnabled)
+            {
+                if (this.Input.KeyPressed(Keys.OemCloseBrackets))
+                    this.Map.Zoom(MapManager.BASE_ZOOM_IN_AMOUNT, zoomOrigin: this.Input.CurrentMouseState.ToVector2());
 
-            if (this.Input.KeyPressed(Keys.OemOpenBrackets))
-                this.Map.Zoom(MapManager.BASE_ZOOM_OUT_AMOUNT, zoomOrigin: this.Input.CurrentMouseState.ToVector2());
+                if (this.Input.KeyPressed(Keys.OemOpenBrackets))
+                    this.Map.Zoom(MapManager.BASE_ZOOM_OUT_AMOUNT, zoomOrigin: this.Input.CurrentMouseState.ToVector2());
 
-            if (this.Input.KeyPressed(Keys.OemPlus))
-                this.Map.Zoom(MapManager.BASE_ZOOM_IN_AMOUNT);
+                if (this.Input.KeyPressed(Keys.OemPlus))
+                    this.Map.Zoom(MapManager.BASE_ZOOM_IN_AMOUNT);
 
-            if (this.Input.KeyPressed(Keys.OemMinus))
-                this.Map.Zoom(MapManager.BASE_ZOOM_OUT_AMOUNT);
+                if (this.Input.KeyPressed(Keys.OemMinus))
+                    this.Map.Zoom(MapManager.BASE_ZOOM_OUT_AMOUNT);
+            }
 
             #endregion
 
@@ -193,14 +204,17 @@ namespace Zo
             && this.Platform.Sizes.ActualMapRectangle.Contains(this.Input.CurrentMouseState))
                 this.Map.StartMoving(this.Input.CurrentMouseState.ToVector2());
 
-            if (this.Input.KeyDown(Keys.Left))
-                this.Map.Move(10f, 0);
-            if (this.Input.KeyDown(Keys.Right))
-                this.Map.Move(-10f, 0);
-            if (this.Input.KeyDown(Keys.Up))
-                this.Map.Move(0, 10f);
-            if (this.Input.KeyDown(Keys.Down))
-                this.Map.Move(0, -10f);
+            if (!this.Input.TypingEnabled)
+            {
+                if (this.Input.KeyDown(Keys.Left))
+                    this.Map.Move(10f, 0);
+                if (this.Input.KeyDown(Keys.Right))
+                    this.Map.Move(-10f, 0);
+                if (this.Input.KeyDown(Keys.Up))
+                    this.Map.Move(0, 10f);
+                if (this.Input.KeyDown(Keys.Down))
+                    this.Map.Move(0, -10f);
+            }
 
             #endregion
 
@@ -222,54 +236,63 @@ namespace Zo
                         this.Map.SelectGeographicalRegion(relativePosition, combineRegions: this.Input.KeysDownAny(Keys.LeftControl, Keys.RightControl));
                         break;
                 }
+
+                if (this.Input.TypingEnabled)
+                {
+                    // conditionally unflag
+                    this.Input.TypingEnabled = false;
+                }
             }
 
             #endregion
 
             #region State Management
 
-            // if (this.Input.KeyPressed(Keys.Z))
-            //     IncrementStateIndex();
-
-            if (this.Input.KeyPressed(Keys.J))
-                this.ChangeProperty(x => x.AreaIndex, x => x.AddWithUpperLimit(1, 6));
-            if (this.Input.KeyPressed(Keys.K))
-                this.ChangeProperty(x => x.AreaIndex, x => x.AddWithLowerLimit(-1, -1));
-            if (this.Input.KeyPressed(Keys.N))
-                this.BorderCycle.Advance();
-            if (this.Input.KeyPressed(Keys.M))
-                this.BorderCycle.Reverse();
-
-            if (this.Input.KeyPressed(Keys.U))
+            if (!this.Input.TypingEnabled)
             {
-                this.ChangeProperty(x => x.AreaIndex, x => x.AddWithUpperLimit(1, 6));
-                this.BorderCycle.Advance();
+                // if (this.Input.KeyPressed(Keys.Z))
+                //     IncrementStateIndex();
+
+                if (this.Input.KeyPressed(Keys.J))
+                    this.ChangeProperty(x => x.AreaIndex, x => x.AddWithUpperLimit(1, 6));
+                if (this.Input.KeyPressed(Keys.K))
+                    this.ChangeProperty(x => x.AreaIndex, x => x.AddWithLowerLimit(-1, -1));
+                if (this.Input.KeyPressed(Keys.N))
+                    this.BorderCycle.Advance();
+                if (this.Input.KeyPressed(Keys.M))
+                    this.BorderCycle.Reverse();
+
+                if (this.Input.KeyPressed(Keys.U))
+                {
+                    this.ChangeProperty(x => x.AreaIndex, x => x.AddWithUpperLimit(1, 6));
+                    this.BorderCycle.Advance();
+                }
+                if (this.Input.KeyPressed(Keys.I))
+                {
+                    this.ChangeProperty(x => x.AreaIndex, x => x.AddWithLowerLimit(-1, -1));
+                    this.BorderCycle.Reverse();
+                }
+
+                if (this.Input.KeyPressed(Keys.L))
+                    this.Map.VisibleBorder = !this.Map.VisibleBorder;
+
+                if (this.Input.KeyPressed(Keys.G))
+                    this.Map.VisibleLabel = !this.Map.VisibleLabel;
+
+                if (this.Input.KeyPressed(Keys.D8))
+                    this.Map.CycleMapType();
+
+                if (this.Input.KeyPressed(Keys.D9))
+                    this.Map.LowerDivision();
+                if (this.Input.KeyPressed(Keys.D0))
+                    this.Map.RaiseDivision();
             }
-            if (this.Input.KeyPressed(Keys.I))
-            {
-                this.ChangeProperty(x => x.AreaIndex, x => x.AddWithLowerLimit(-1, -1));
-                this.BorderCycle.Reverse();
-            }
-
-            if (this.Input.KeyPressed(Keys.L))
-                this.Map.VisibleBorder = !this.Map.VisibleBorder;
-
-            if (this.Input.KeyPressed(Keys.G))
-                this.Map.VisibleLabel = !this.Map.VisibleLabel;
-
-            if (this.Input.KeyPressed(Keys.D8))
-                this.Map.CycleMapType();
-
-            if (this.Input.KeyPressed(Keys.D9))
-                this.Map.LowerDivision();
-            if (this.Input.KeyPressed(Keys.D0))
-                this.Map.RaiseDivision();
 
             #endregion
 
             #region Reset
 
-            if (this.Input.KeyPressed(Keys.R) && !this.Platform.Device.IsFullScreen)
+            if (this.Input.KeyPressed(Keys.R) && !this.Platform.Device.IsFullScreen && !this.Input.TypingEnabled)
             {
                 this.Platform.ResetGlobalScaleAndRescaleWindow();
                 this.Window.Position = new Point(
@@ -281,18 +304,33 @@ namespace Zo
             }
 
             #endregion
+
+            #region Enable Typing
+
+            if (this.RecentlyFinishedTyping)
+                this.RecentlyFinishedTyping = false;
+            else if (!this.Input.TypingEnabled)
+            {
+                if (this.Map.SelectedFief.HasValue() && this.Input.KeyPressed(Keys.Enter))
+                {
+                    this.Input.TypingEnabled = true;
+                    this.InputSource = InputSource.FiefName;
+                }
+            }
+
+            #endregion
         }
 
         protected override void Draw(GameTime gameTime)
         {
+            // clears the backbuffer, giving the GPU a reliable internal state to work with
             this.GraphicsDevice.Clear(Platform.BackgroundColor);
-
-            // if (this.SpriteBatch == null)
-            //     return;
 
             // PointClamp: scaling uses nearest pixel instead of blurring
             // BlendState.NonPremultiplied, AlphaBlend
             this.SpriteBatch.Begin(SpriteSortMode.FrontToBack, BlendState.NonPremultiplied, SamplerState.PointWrap);
+
+            this.OnDraw?.Invoke(this.SpriteBatch);
 
             var actualMapScale = this.Map.Scale * this.Platform.GlobalScale;
 
@@ -415,7 +453,8 @@ namespace Zo
                 // + Environment.NewLine + this.Platform.Device.GraphicsDevice.DisplayMode.Width / (float) SizeManager.BASE_TOTAL_WIDTH
                 // + Environment.NewLine + this.Platform.Device.GraphicsDevice.DisplayMode.Height / (float) SizeManager.BASE_TOTAL_HEIGHT
                 // + Environment.NewLine + "keysup:" + this.Input.KeysUp(Keys.LeftControl, Keys.RightControl)
-                + Environment.NewLine + "selected: " + this.Map.SelectedFief?.Name
+                + Environment.NewLine + "Selected: " + this.Map.SelectedFief?.Name
+                + Environment.NewLine + "Typing: " + (this.Input.TypingEnabled ? new string(this.Input.TypedCharacters.ToArray()) : "false")
                 , this.Platform.Sizes.SideTextPosition);
 
             this.DrawText(this.Map.Debug,
@@ -467,42 +506,69 @@ namespace Zo
             );
 
             this.SpriteBatch.End();
-
-            this.Frame.Draw(gameTime);
         }
 
         #endregion
 
         #region Helper Methods
 
-        public void DrawText(string text, Vector2 position, Color? color = default, float? scale = default, float? depth = default, bool center = false)
+        protected void DrawText(string text, Vector2 position, Color? color = default, float? scale = default, float? depth = default, bool center = false)
         {
             if (text.IsNullOrWhiteSpace())
                 return;
-            color.DefaultTo(Color.LightGoldenrodYellow);
+
+            color.DefaultTo(Color.FloralWhite);
             depth.DefaultTo(0.9f);
             scale.DefaultTo(this.Platform.GlobalScale);
 
             if (center)
-                position -= new Vector2(this.Text.CharacterSize.X * text.Length / 2f, 0f);
-            var shadePosition = position + new Vector2(1);
-            var shadeDepth = depth.Value - 0.01f;
+                position -= new Vector2((this.Text.CharacterSize.X + this.Text.Font.Spacing) * text.Length / 1.5f, this.Text.CharacterSize.Y / 1.5f);
 
-            this.SpriteBatch.DrawString(this.Text.Font, text, shadePosition, Color.Black,
-                rotation: 0f, origin: default, scale.Value, SpriteEffects.None, shadeDepth);
-            this.SpriteBatch.DrawString(this.Text.Font, text, position, color.Value,
-                rotation: 0f, origin: default, scale.Value, SpriteEffects.None, depth.Value);
+            this.SpriteBatch.DrawText(this.Text.Font, text, position, color.Value, scale.Value, depth.Value);
         }
 
         #endregion
 
         #region Event Methods
 
+        protected void OnTyping(object sender, TextInputEventArgs e)
+        {
+            if (!this.Input.TypingEnabled)
+                return;
+
+            if (e.Key == Keys.Enter)
+            {
+                var typed = new string(this.Input.TypedCharacters.ToArray());
+                this.Input.TypedCharacters.Clear();
+
+                switch (this.InputSource)
+                {
+                    case InputSource.None:
+                        Console.WriteLine("Invalid typing state.");
+                        break;
+                    case InputSource.FiefName:
+                        this.Map.RenameFief(typed);
+                        break;
+                }
+
+                this.Input.TypingEnabled = false;
+                this.RecentlyFinishedTyping = true;
+            }
+            else
+            {
+                if (e.Key == Keys.Back)
+                    this.Input.TypedCharacters.RemoveLast();
+                else
+                    this.Input.TypedCharacters.Add(e.Character);
+            }
+        }
+
         // this.Window.ClientSizeChanged gets called 3 times after resizing the window ??!!
         // EVEN if we unsubscribe in the method and not resubscribe until disposal ??!!
         // so instead we can delay resubscribing until the next Update call
         // but if resizing is slow (Update gets called before resizing is finished), then it resubscribes too early
-        // so instead to waiting for another update call, we add a timed delay
+        // so instead to waiting for another update call, we add a minimum frame count
+        // TODO figure out why delay works but frame count doesnt
         protected void OnWindowResize(object sender, EventArgs e)
         {
             using var scope = this.OnWindowResizeDelayedResubscriptionScope();
@@ -516,17 +582,35 @@ namespace Zo
             Action postOperation = () => _canDelayResubscription.Case(() =>
                 {
                     _canDelayResubscription = false;
-                    Task.Delay(500).ContinueWith(_ => this.ResubscribeOnWindowResize());
+                    Task.Delay(500).ContinueWith(_ => this.ResubscribeOnWindowResize(default));
                 });
             return new Scope(preOperation, postOperation);
         }
 
-        protected void ResubscribeOnWindowResize()
+        protected void ResubscribeOnWindowResize(GameTime gameTime)
         {
             this.Window.ClientSizeChanged += this.OnWindowResize;
             this.OnUpdate -= this.ResubscribeOnWindowResize;
             _canDelayResubscription = true;
         }
+
+        // protected Scope OnWindowResizeDelayedResubscriptionScope()
+        // {
+        //     Action preOperation = () => this.Window.ClientSizeChanged -= this.OnWindowResize;
+        //     Action postOperation = () => this.OnUpdate += this.ResubscribeOnWindowResize;
+        //     return new Scope(preOperation, postOperation);
+        // }
+
+        // protected int _resubscribeOnWindowResizeFrameCounter;
+        // protected void ResubscribeOnWindowResize(GameTime gameTime)
+        // {
+        //     if (_resubscribeOnWindowResizeFrameCounter++ < 1000)
+        //         return;
+
+        //     _resubscribeOnWindowResizeFrameCounter = 0;
+        //     this.Window.ClientSizeChanged += this.OnWindowResize;
+        //     this.OnUpdate -= this.ResubscribeOnWindowResize;
+        // }
 
         #endregion
     }

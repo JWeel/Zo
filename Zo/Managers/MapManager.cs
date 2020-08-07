@@ -25,7 +25,7 @@ namespace Zo.Managers
 
         #region Constructors
 
-        public MapManager(SizeManager sizes, TextureRepository texture, Action<Action> subscribeToUpdate)
+        public MapManager(SizeManager sizes, TextureRepository texture, Action<Action<GameTime>> subscribeToUpdate)
         {
             subscribeToUpdate(this.UpdateState);
             sizes.OnCalculating += this.HandleSizesCalculating;
@@ -325,11 +325,17 @@ namespace Zo.Managers
         public IEnumerable<Fief> GetFiefs() =>
             this.Map.Fiefs;
 
+        // maybe update name of region? maybe inside UpdateName method?
+        public void RenameFief(string name) =>
+            (!name.IsNullOrWhiteSpace()).Case(() => this.SelectedFief?.UpdateName(name));
+
         #endregion
 
         #region Protected Methods
 
-        protected void UpdateState() { }
+        protected void UpdateState(GameTime gameTime)
+        {
+        }
 
         protected void HandleSizesCalculating()
         {
