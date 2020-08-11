@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
+using Zo.Extensions;
 
 namespace Zo.Data
 {
@@ -26,9 +27,9 @@ namespace Zo.Data
 
         public Region Region { get; protected set; }
 
-        public Rgba Rgba { get; }
+        public Rgba Rgba { get;protected set; }
 
-        public Color Color { get; }
+        public Color Color { get;protected set; }
 
         protected List<Cell> Cells { get; }
 
@@ -44,6 +45,14 @@ namespace Zo.Data
         public void UpdateName(string name)
         {
             this.Name = name;
+            this.Region = this.Region.CopyWith((x => x.Name, name));
+        }
+
+        public void UpdateRgba(Rgba rgba)
+        {
+            this.Rgba = rgba;
+            this.Color = (Color) rgba;
+            this.Region = this.Region.CopyWith((x => x.Rgba, rgba), (x => x.Color, (Color) rgba));
         }
 
         #endregion

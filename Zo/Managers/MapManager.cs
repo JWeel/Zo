@@ -25,13 +25,10 @@ namespace Zo.Managers
 
         #region Constructors
 
-        public MapManager(SizeManager sizes, TextureRepository texture, Action<Action<GameTime>> subscribeToUpdate)
+        public MapManager(SizeManager sizes, RandomManager random, TextureRepository texture, Action<Action<GameTime>> subscribeToUpdate)
         {
-            subscribeToUpdate(this.UpdateState);
-            sizes.OnCalculating += this.HandleSizesCalculating;
-            sizes.OnCalculated += this.HandleSizesCalculated;
-
             this.Sizes = sizes;
+            this.Random = random;
             this.Texture = texture;
 
             this.Scale = BASE_MAP_ZOOM;
@@ -43,6 +40,10 @@ namespace Zo.Managers
 
             this.MapType = new Cycle<MapType>(default(MapType).GetValues());
             this.Division = new Axis<Division>(default(Division).GetValues());
+
+            subscribeToUpdate(this.UpdateState);
+            sizes.OnCalculating += this.HandleSizesCalculating;
+            sizes.OnCalculated += this.HandleSizesCalculated;
         }
 
         #endregion
@@ -52,6 +53,8 @@ namespace Zo.Managers
         public event Action OnSelected;
 
         public SizeManager Sizes { get; }
+
+        public RandomManager Random { get; }
 
         public TextureRepository Texture { get; }
 
@@ -275,8 +278,7 @@ namespace Zo.Managers
                     if (!this.SelectedFief.HasValue())
                     {
                         var fiefName = $"f-{this.FiefCounter++}";
-                        var random = new Random();
-                        var fiefRgba = new Rgba((uint) random.Next(35, 230), (uint) random.Next(35, 230), (uint) random.Next(35, 230), 235u);
+                        var fiefRgba = this.Random.FiefRgba();
                         var fiefRegion = new Region(id: "n/a", fiefName, fiefRgba,
                             mappedRegion.Position, mappedRegion.Center, mappedRegion.ColorsByPixelIndex,
                             mappedRegion.Texture, mappedRegion.OutlineTexture, mappedRegion.CombinedTexture);
@@ -289,11 +291,6 @@ namespace Zo.Managers
                     {
                         var newRegion = this.Map.CreateRegionByCombining(this.SelectedFief.Name, this.SelectedFief.Rgba, this.SelectedFief.Region.YieldWith(mappedRegion));
                         this.SelectedFief.UpdateRegion(newRegion);
-
-                        // if (this.SelectedRegion.HasValue())
-                        //     this.SelectedRegion = this.SelectedFief.Region;
-                        // if (this.LastSelection.HasValue())
-                        //     this.LastSelection = this.SelectedFief.Region;
                     }
                     this.SelectedRegion = this.SelectedFief.Region;
                     this.LastSelection = this.SelectedFief.Region;
@@ -325,9 +322,23 @@ namespace Zo.Managers
         public IEnumerable<Fief> GetFiefs() =>
             this.Map.Fiefs;
 
-        // maybe update name of region? maybe inside UpdateName method?
-        public void RenameFief(string name) =>
-            (!name.IsNullOrWhiteSpace()).Case(() => this.SelectedFief?.UpdateName(name));
+        public void RenameFief(string name)
+        {
+            if (name.IsNullOrWhiteSpace())
+                return;
+            this.SelectedFief?.UpdateName(name);
+            this.SelectedRegion = this.SelectedFief?.Region;
+            this.LastSelection = this.SelectedRegion;
+        }
+
+        public void RecolorFief(Rgba rgba)
+        {
+            if (rgba == default)
+                return;
+            this.SelectedFief?.UpdateRgba(rgba);
+            this.SelectedRegion = this.SelectedFief?.Region;
+            this.LastSelection = this.SelectedRegion;
+        }
 
         #endregion
 

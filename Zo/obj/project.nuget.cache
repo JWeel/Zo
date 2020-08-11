@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "quk7LkYYHQHFwti/e9ZRrdc4Jha9hUYKTCfmwzJRaBZqIpZgY5dli3vmG3l+yYZ1SZ7z8LXS7IVMbf56kWTvjQ==",
+  "dgSpecHash": "4TLdQwkTDTEdMRTV7h4/2p7K0fSgmbZEA7EVnX3/6TG/mt8dDro223X5KCigoXM/PnLTdIPalFVMpXBrzTtbyQ==",
   "success": true,
-  "projectFilePath": "D:\\Documents\\Code\\zo\\Zo\\Zo.csproj",
+  "projectFilePath": "D:\\Documents\\Code\\repos\\zo\\Zo\\Zo.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\admin\\.nuget\\packages\\monogame.content.builder\\3.7.0.4\\monogame.content.builder.3.7.0.4.nupkg.sha512",
     "C:\\Users\\admin\\.nuget\\packages\\monogame.framework.desktopgl.core\\3.7.0.7\\monogame.framework.desktopgl.core.3.7.0.7.nupkg.sha512"

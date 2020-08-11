@@ -47,7 +47,7 @@ namespace Zo.Managers
 
         #endregion
 
-        #region Methods
+        #region Public Methods
 
         public void LoadContent(ContentManager content)
         {

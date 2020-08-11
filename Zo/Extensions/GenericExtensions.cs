@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Runtime.Serialization;
 
 namespace Zo.Extensions
 {
@@ -303,6 +304,81 @@ namespace Zo.Extensions
                 return;
             source.RemoveAt(source.Count - 1);
         }
+
+        #endregion
+
+        #region Factory
+
+        /// <summary> Returns a new instance of this <paramref name="type"/> using <see cref="Activator.CreateInstance(Type)"/>. </summary>
+        public static object Activate(this Type type) =>
+            Activator.CreateInstance(type);
+
+        /// <summary> Returns a new instance of this <paramref name="type"/> using <see cref="Activator.CreateInstance(Type)"/> and casts it to type <typeparamref name="T"/>. </summary>
+        /// <typeparam name="T"> The type to cast to. </typeparam>
+        /// <exception cref="InvalidCastException"> Specified cast is not valid. s</exception>
+        public static T Activate<T>(this Type type) =>
+            (T) type.Activate();
+
+        /// <summary> Returns a new instance of this <paramref name="type"/> using <see cref="Expression.New(Type)"/>. </summary>
+        public static object Express(this Type type) =>
+            Expression.Lambda<Func<object>>(Expression.MemberInit(Expression.New(type))).Compile().Invoke();
+
+        /// <summary> Returns a new instance of this <paramref name="type"/> using <see cref="Expression.New(Type)"/> and casts it to type <typeparamref name="T"/>. </summary>
+        /// <typeparam name="T"> The type to cast to. </typeparam>
+        /// <exception cref="InvalidCastException"> Specified cast is not valid. s</exception>
+        public static T Express<T>(this Type type) =>
+            (T) type.Express();
+
+        /// <summary> Returns a new instance of this <paramref name="type"/> using <see cref="FormatterServices.GetUninitializedObject(Type)"/>. </summary>
+        public static object Uninitialize(this Type type) =>
+            FormatterServices.GetUninitializedObject(type);
+
+        /// <summary> Returns a new instance of this <paramref name="type"/> using <see cref="FormatterServices.GetUninitializedObject(Type)"/> and casts it to type <typeparamref name="T"/>. </summary>
+        /// <typeparam name="T"> The type to cast to. </typeparam>
+        /// <exception cref="InvalidCastException"> Specified cast is not valid. s</exception>
+        public static T Uninitialize<T>(this Type type) =>
+            (T) type.Uninitialize();
+
+        #endregion
+
+        #region Copy With
+
+        /// <summary> Creates a new instance of the type of this instance, with all fields copied over.
+        /// <br/> Alterations can be specified by providing tuples containing a property expression that points to a property and the alternate value for that property. 
+        /// <para/> Note: This method does not guarantee a valid instance, because it uses <see cref="FormatterServices.GetUninitializedObject(Type)"/> to create an instance. Any additional constructor logic will therefore not be handled.
+        /// </summary>
+        public static T CopyWith<T>(this T instance, params (Expression<Func<T, object>> PropertySelector, object Value)[] selectors)
+        {
+            var type = typeof(T);
+            var copy = type.Uninitialize<T>();
+            type
+                .GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                .Each(field => field.GetValue(instance).Into(value => field.SetValue(copy, value)));
+            selectors
+                .Select(selector => (selector.Value, Field: selector.PropertySelector
+                    ?.Into(expression => expression.Body.StripUnary() as MemberExpression)
+                    ?.Into(memberExpression => memberExpression?.Member as PropertyInfo)
+                    ?.Into(property => property?.Name)
+                    ?.Into(type.GetPropertyBackingField)))
+                .Where(x => x.Field.HasValue())
+                .Each(x => x.Field.SetValue(copy, x.Value));
+            return copy;
+        }
+
+        public static Expression StripUnary(this Expression source)
+        {
+            while (source is UnaryExpression unary)
+                source = unary.Operand;
+            return source;
+        }
+
+        #endregion
+
+        #region Get Property Backing Field
+
+        /// <summary> Returns a <see cref="FieldInfo"/> representing the field that backs a property with a given name. </summary>
+        public static FieldInfo GetPropertyBackingField(this Type type, string propertyName) =>
+            type.GetField($"<{propertyName}>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic);
 
         #endregion
     }

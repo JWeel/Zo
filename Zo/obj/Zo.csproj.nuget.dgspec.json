@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "D:\\Documents\\Code\\zo\\Zo\\Zo.csproj": {}
+    "D:\\Documents\\Code\\repos\\zo\\Zo\\Zo.csproj": {}
   },
   "projects": {
-    "D:\\Documents\\Code\\zo\\Zo\\Zo.csproj": {
+    "D:\\Documents\\Code\\repos\\zo\\Zo\\Zo.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Documents\\Code\\zo\\Zo\\Zo.csproj",
+        "projectUniqueName": "D:\\Documents\\Code\\repos\\zo\\Zo\\Zo.csproj",
         "projectName": "Zo",
-        "projectPath": "D:\\Documents\\Code\\zo\\Zo\\Zo.csproj",
+        "projectPath": "D:\\Documents\\Code\\repos\\zo\\Zo\\Zo.csproj",
         "packagesPath": "C:\\Users\\admin\\.nuget\\packages\\",
-        "outputPath": "D:\\Documents\\Code\\zo\\Zo\\obj\\",
+        "outputPath": "D:\\Documents\\Code\\repos\\zo\\Zo\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder"

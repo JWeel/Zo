@@ -1,9 +1,9 @@
-﻿using System.Threading.Tasks;
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 using Zo.Enums;
 using Zo.Extensions;
 using Zo.Helpers;
@@ -60,6 +60,8 @@ namespace Zo
 
         protected FrameManager Frame { get; set; }
 
+        protected RandomManager Random { get; set; }
+
         protected InputSource InputSource { get; set; }
 
         // yuck
@@ -71,11 +73,11 @@ namespace Zo
 
         protected override void Initialize()
         {
+            this.Random = new RandomManager(this.Platform.Sizes, subscription => this.OnUpdate += subscription);
             this.Input = new InputManager(this.Platform.Sizes, subscription => this.OnUpdate += subscription);
             this.Text = new TextManager(this.Platform.Sizes, subscription => this.OnUpdate += subscription);
-            this.Map = new MapManager(this.Platform.Sizes, this.Texture, subscription => this.OnUpdate += subscription);
+            this.Map = new MapManager(this.Platform.Sizes, this.Random, this.Texture, subscription => this.OnUpdate += subscription);
             this.Animation = new AnimationManager(subscription => this.OnUpdate += subscription, subscription => this.Map.OnSelected += subscription);// this.Map.SubscribeToSelect);
-
             this.Frame = new FrameManager(this.Platform.Sizes, subscription => this.OnUpdate += subscription, subscription => this.OnDraw += subscription);
 
             // if GameWindow.AllowUserResizing is set in our ctor, 
@@ -286,6 +288,9 @@ namespace Zo
                     this.Map.LowerDivision();
                 if (this.Input.KeyPressed(Keys.D0))
                     this.Map.RaiseDivision();
+
+                if (this.Map.SelectedFief.HasValue() && this.Input.KeyPressed(Keys.V))
+                    this.Map.RecolorFief(this.Random.FiefRgba());
             }
 
             #endregion
@@ -324,7 +329,7 @@ namespace Zo
         protected override void Draw(GameTime gameTime)
         {
             // clears the backbuffer, giving the GPU a reliable internal state to work with
-            this.GraphicsDevice.Clear(Platform.BackgroundColor);
+            this.GraphicsDevice.Clear(this.Platform.BackgroundColor);
 
             // PointClamp: scaling uses nearest pixel instead of blurring
             // BlendState.NonPremultiplied, AlphaBlend
@@ -567,7 +572,7 @@ namespace Zo
         // EVEN if we unsubscribe in the method and not resubscribe until disposal ??!!
         // so instead we can delay resubscribing until the next Update call
         // but if resizing is slow (Update gets called before resizing is finished), then it resubscribes too early
-        // so instead to waiting for another update call, we add a minimum frame count
+        // so instead to waiting for another update call, we add a delay
         // TODO figure out why delay works but frame count doesnt
         protected void OnWindowResize(object sender, EventArgs e)
         {
@@ -582,7 +587,7 @@ namespace Zo
             Action postOperation = () => _canDelayResubscription.Case(() =>
                 {
                     _canDelayResubscription = false;
-                    Task.Delay(500).ContinueWith(_ => this.ResubscribeOnWindowResize(default));
+                    Task.Delay(100).ContinueWith(_ => this.ResubscribeOnWindowResize(default));
                 });
             return new Scope(preOperation, postOperation);
         }
@@ -604,7 +609,7 @@ namespace Zo
         // protected int _resubscribeOnWindowResizeFrameCounter;
         // protected void ResubscribeOnWindowResize(GameTime gameTime)
         // {
-        //     if (_resubscribeOnWindowResizeFrameCounter++ < 1000)
+        //     if (_resubscribeOnWindowResizeFrameCounter++ < 100)
         //         return;
 
         //     _resubscribeOnWindowResizeFrameCounter = 0;
