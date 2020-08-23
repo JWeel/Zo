@@ -23,7 +23,7 @@ namespace Zo.Managers
         {
             subscribeToUpdate(this.HandleOnUpdate);
             subscribeToSelect(this.HandleOnSelect);
-            this.SelectionColor = new Cycle<Color>(SELECTION_COLOR, Color.Transparent);
+            this.SelectionColor = new Cycle<Color>(SELECTION_COLOR);//, Color.Transparent);
             this.AnimationTimer = new Timer(_ => this.SelectionColor.Advance(), state: null, dueTime: 0, period: BLINK_INTERVAL);
         }
 

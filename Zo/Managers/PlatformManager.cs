@@ -22,8 +22,10 @@ namespace Zo.Managers
 
         #region Constructors
 
-        public PlatformManager(Func<GraphicsDeviceManager> graphicsDeviceFactory)
+        public PlatformManager(Func<GraphicsDeviceManager> graphicsDeviceFactory, Action<Action<ContentManager>> subscribeToLoad)
         {
+            subscribeToLoad(this.LoadContent);
+
             this.ResetGlobalScale();
 
             this.Device = graphicsDeviceFactory();
@@ -80,15 +82,6 @@ namespace Zo.Managers
 
         #region Public Methods
 
-        public void LoadContent(ContentManager content)
-        {
-            this.BackgroundColor = BACKGROUND_COLOR;
-            this.WindowColor = WINDOW_COLOR;
-            this.SidePanelColor = SIDE_PANEL_COLOR;
-
-            this.CalculateScaledSizes();
-        }
-
         public void ToggleFullScreen()
         {
             this.Device.ToggleFullScreen();
@@ -135,6 +128,18 @@ namespace Zo.Managers
 
         #region Protected Methods
 
+        protected void LoadContent(ContentManager content)
+        {
+            this.BackgroundColor = BACKGROUND_COLOR;
+            this.WindowColor = WINDOW_COLOR;
+            this.SidePanelColor = SIDE_PANEL_COLOR;
+
+            this.CalculateScaledSizes();
+        }
+
+        protected void CalculateScaledSizes() =>
+            this.Sizes.Calculate(this.GlobalScale, useWindowBorder: !this.Device.IsFullScreen);
+
         protected void ResetGlobalScale() =>
             this.GlobalScale = BASE_GLOBAL_SCALE;
 
@@ -145,11 +150,6 @@ namespace Zo.Managers
             (fromWidth
                 ? this.Device.GraphicsDevice.Viewport.Width / (float) SizeManager.BASE_TOTAL_WIDTH
                 : this.Device.GraphicsDevice.Viewport.Height / (float) SizeManager.BASE_TOTAL_HEIGHT);
-
-        protected void CalculateScaledSizes()
-        {
-            this.Sizes.Calculate(this.GlobalScale, useWindowBorder: !this.Device.IsFullScreen);
-        }
 
         protected void HandleSizesCalculated()
         {

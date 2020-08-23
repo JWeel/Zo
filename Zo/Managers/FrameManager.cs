@@ -6,18 +6,20 @@ using Zo.Extensions;
 
 namespace Zo.Managers
 {
+    /// <summary> Keeps track of application framerate. </summary>
     public class FrameManager
     {
-        protected SizeManager Sizes { get; }
+        #region Constants
 
-        protected int FrameRate { get; set; }
-        protected int FrameCounter { get; set; }
-        protected TimeSpan ElapsedTime { get; set; }
+        private static readonly TimeSpan ONE_SECOND = TimeSpan.FromSeconds(1);
 
-        protected SpriteFont Font { get; set; }
+        #endregion
 
-        public FrameManager(SizeManager sizes, Action<Action<GameTime>> subscribeToUpdate, Action<Action<SpriteBatch>> subscribeToDraw)
+        #region Constructors
+
+        public FrameManager(SizeManager sizes, Action<Action<ContentManager>> subscribeToLoad, Action<Action<GameTime>> subscribeToUpdate, Action<Action<SpriteBatch>> subscribeToDraw)
         {
+            subscribeToLoad(this.LoadContent);
             subscribeToUpdate(this.UpdateState);
             subscribeToDraw(this.DrawState);
 
@@ -27,28 +29,44 @@ namespace Zo.Managers
             this.ElapsedTime = TimeSpan.Zero;
         }
 
-        public void LoadContent(ContentManager content)
+        #endregion
+
+        #region Properties
+        protected SizeManager Sizes { get; }
+
+        protected int FrameRate { get; set; }
+        protected int FrameCounter { get; set; }
+        protected TimeSpan ElapsedTime { get; set; }
+
+        protected SpriteFont Font { get; set; }
+
+        #endregion
+
+        #region Methods
+
+        protected void LoadContent(ContentManager content)
         {
             this.Font = content.Load<SpriteFont>("Alphabet/alphabet");
         }
 
-        public void UpdateState(GameTime gameTime)
+        protected void UpdateState(GameTime gameTime)
         {
             this.ElapsedTime += gameTime.ElapsedGameTime;
+            if (this.ElapsedTime < ONE_SECOND)
+                return;
 
-            if (this.ElapsedTime > TimeSpan.FromSeconds(1))
-            {
-                this.ElapsedTime -= TimeSpan.FromSeconds(1);
-                this.FrameRate = this.FrameCounter;
-                this.FrameCounter = 0;
-            }
+            this.ElapsedTime -= ONE_SECOND;
+            this.FrameRate = this.FrameCounter;
+            this.FrameCounter = 0;
         }
 
-        public void DrawState(SpriteBatch spriteBatch)
+        protected void DrawState(SpriteBatch spriteBatch)
         {
             this.FrameCounter++;
             string text = this.FrameRate.ToString();
             spriteBatch.DrawText(this.Font, text, this.Sizes.BorderSizeVector, Color.White, scale: 1f, depth: 0.9f);
         }
+
+        #endregion
     }
 }

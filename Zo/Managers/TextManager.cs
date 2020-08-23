@@ -19,8 +19,9 @@ namespace Zo.Managers
 
         #region Constructors
 
-        public TextManager(SizeManager sizes, Action<Action<GameTime>> subscribeToUpdate)
+        public TextManager(SizeManager sizes, Action<Action<ContentManager>> subscribeToLoad, Action<Action<GameTime>> subscribeToUpdate)
         {
+            subscribeToLoad(this.LoadContent);
             subscribeToUpdate(this.UpdateState);
         }
 
@@ -49,14 +50,14 @@ namespace Zo.Managers
 
         #region Public Methods
 
-        public void LoadContent(ContentManager content)
-        {
-            this.Font = content.Load<SpriteFont>("Alphabet/alphabet");
-        }
-
         #endregion
 
         #region Protected Methods
+
+        protected void LoadContent(ContentManager content)
+        {
+            this.Font = content.Load<SpriteFont>("Alphabet/alphabet");
+        }
 
         protected void UpdateState(GameTime gameTime)
         {

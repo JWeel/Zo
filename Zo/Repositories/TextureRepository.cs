@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
@@ -9,8 +10,10 @@ namespace Zo.Repositories
     {
         #region Constructors
 
-        public TextureRepository(GraphicsDevice graphicsDevice)
+        public TextureRepository(GraphicsDevice graphicsDevice, Action<Action<ContentManager>> subscribeToLoad)
         {
+            subscribeToLoad(this.LoadContent);
+            
             this.GraphicsDevice = graphicsDevice;
         }
 
@@ -48,7 +51,17 @@ namespace Zo.Repositories
 
         #region Public Methods
 
-        public void LoadContent(ContentManager content)
+        public Texture2D Create(int width, int height) =>
+            new Texture2D(this.GraphicsDevice, width, height);
+
+        public Texture2D Create(int width, int height, Color[] colorsByPixelIndex) =>
+            new Texture2D(this.GraphicsDevice, width, height).WithSetData(colorsByPixelIndex);
+
+        #endregion
+
+        #region Protected Methods
+
+        protected void LoadContent(ContentManager content)
         {
             this.MapBackground = content.Load<Texture2D>("Land/background");
 
@@ -77,13 +90,7 @@ namespace Zo.Repositories
 
             this.Blank = this.Create(1, 1).With(tex => tex.SetData(Color.White.IntoArray()));
         }
-
-        public Texture2D Create(int width, int height) =>
-            new Texture2D(this.GraphicsDevice, width, height);
-
-        public Texture2D Create(int width, int height, Color[] colorsByPixelIndex) =>
-            new Texture2D(this.GraphicsDevice, width, height).WithSetData(colorsByPixelIndex);
-
+        
         #endregion
     }
 }

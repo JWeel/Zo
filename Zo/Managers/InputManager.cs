@@ -72,10 +72,13 @@ namespace Zo.Managers
             (this.LastMouseState.ScrollWheelValue != this.CurrentMouseState.ScrollWheelValue);
 
         public bool MouseScrolledUp() =>
-            this.CurrentMouseState.ScrollWheelValue > this.LastMouseState.ScrollWheelValue;
+            (this.CurrentMouseState.ScrollWheelValue > this.LastMouseState.ScrollWheelValue);
 
         public bool MouseScrolledDown() =>
-            this.CurrentMouseState.ScrollWheelValue < this.LastMouseState.ScrollWheelValue;
+            (this.CurrentMouseState.ScrollWheelValue < this.LastMouseState.ScrollWheelValue);
+
+        public bool MouseMoved() =>
+            (this.LastMouseState.Position != this.CurrentMouseState.Position);
 
         #endregion
 

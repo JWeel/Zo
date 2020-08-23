@@ -345,7 +345,7 @@ namespace Zo.Extensions
 
         /// <summary> Creates a new instance of the type of this instance, with all fields copied over.
         /// <br/> Alterations can be specified by providing tuples containing a property expression that points to a property and the alternate value for that property. 
-        /// <para/> Note: This method does not guarantee a valid instance, because it uses <see cref="FormatterServices.GetUninitializedObject(Type)"/> to create an instance. Any additional constructor logic will therefore not be handled.
+        /// <para/> Note: This method does not guarantee a valid instance, because it uses <see cref="FormatterServices.GetUninitializedObject(Type)"/> to create an instance. All constructor logic will be ignored.
         /// </summary>
         public static T CopyWith<T>(this T instance, params (Expression<Func<T, object>> PropertySelector, object Value)[] selectors)
         {
@@ -357,7 +357,7 @@ namespace Zo.Extensions
             selectors
                 .Select(selector => (selector.Value, Field: selector.PropertySelector
                     ?.Into(expression => expression.Body.StripUnary() as MemberExpression)
-                    ?.Into(memberExpression => memberExpression?.Member as PropertyInfo)
+                    ?.Into(memberExpression => memberExpression?.Member as MemberInfo)
                     ?.Into(property => property?.Name)
                     ?.Into(type.GetPropertyBackingField)))
                 .Where(x => x.Field.HasValue())

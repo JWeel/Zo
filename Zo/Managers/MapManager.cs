@@ -25,8 +25,10 @@ namespace Zo.Managers
 
         #region Constructors
 
-        public MapManager(SizeManager sizes, RandomManager random, TextureRepository texture, Action<Action<GameTime>> subscribeToUpdate)
+        public MapManager(SizeManager sizes, RandomManager random, TextureRepository texture, Action<Action<ContentManager>> subscribeToLoad, Action<Action<GameTime>> subscribeToUpdate)
         {
+            subscribeToLoad(this.LoadContent);
+
             this.Sizes = sizes;
             this.Random = random;
             this.Texture = texture;
@@ -102,6 +104,8 @@ namespace Zo.Managers
 
         public Region SelectedRegion { get; protected set; }
 
+        public Region HighlightedRegion { get; protected set; }
+
         public Fief SelectedFief { get; protected set; }
 
         public Region LastSelection { get; protected set; }
@@ -115,11 +119,6 @@ namespace Zo.Managers
         #endregion
 
         #region Public Methods
-
-        public void LoadContent(ContentManager content)
-        {
-            this.Map.LoadContent(content);
-        }
 
         public string Debug { get; protected set; } = string.Empty;
 
@@ -316,6 +315,47 @@ namespace Zo.Managers
             this.OnSelected?.Invoke();
         }
 
+        public void HighlightFief(Vector2 position)
+        {
+            var regionMapper = this.Map.GeographicalRegions[this.Division.Index];
+            var rgba = regionMapper.RgbaByPixelPosition.Item(position);
+            if (rgba == default)
+            {
+                this.HighlightedRegion = default;
+                return;
+            }
+
+            // TODO better way of mapping fief -> use regionmapper functionality
+            // doesnt work atm. might as well do it with regionmapper anyway
+            var mappedFief = this.Map.Fiefs
+                .FirstOrDefault(fief =>
+                    (position.Floor() - fief.Region.Position)
+                        .Into(relativePosition =>
+                            relativePosition
+                                .LiesWithin(fief.Region.Texture.Width, fief.Region.Texture.Height)
+                                    && fief.Region.ColorsByPixelIndex
+                                        .In2D(fief.Region.Texture.Width)
+                                        .Any(tuple => (tuple.Position == relativePosition) && (tuple.Value != default))));
+            if (mappedFief == default)
+            {
+                this.HighlightedRegion = default;
+                return;
+            }
+            this.HighlightedRegion = mappedFief.Region;
+        }
+
+        public void HighlightGeographicalRegion(Vector2 position)
+        {
+            var regionMapper = this.Map.GeographicalRegions[this.Division.Index];
+            var rgba = regionMapper.RgbaByPixelPosition.Item(position);
+            if (rgba == default)
+            {
+                this.HighlightedRegion = default;
+                return;
+            }
+            this.HighlightedRegion = regionMapper.RegionByRgba[rgba];
+        }
+
         public int GetFiefCount() => this.Map.Fiefs.Count;
         protected int FiefCounter = 0;
 
@@ -343,6 +383,11 @@ namespace Zo.Managers
         #endregion
 
         #region Protected Methods
+
+        protected void LoadContent(ContentManager content)
+        {
+            this.Map.LoadContent(content);
+        }
 
         protected void UpdateState(GameTime gameTime)
         {

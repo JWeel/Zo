@@ -9,6 +9,7 @@ namespace Zo.Data
     {
         #region
 
+        private const float DEFAULT_HIGHLIGHT_MODIFIER = 0.14f;
         private const float DEFAULT_OUTLINE_MODIFIER = -0.14f;
         private const float DEFAULT_OUTLINE_ALPHA = 0.5f;
 
@@ -23,6 +24,7 @@ namespace Zo.Data
             this.Name = name;
             this.Color = (Color) rgba;
             this.OutlineColor = this.Color.Brightened(DEFAULT_OUTLINE_MODIFIER, alpha: DEFAULT_OUTLINE_ALPHA);
+            this.HighlightColor = this.Color.Brightened(DEFAULT_HIGHLIGHT_MODIFIER, alpha: DEFAULT_OUTLINE_ALPHA);
             this.Rgba = rgba;
             this.Position = position;
             this.Center = center;
@@ -47,6 +49,8 @@ namespace Zo.Data
         public Color Color { get; }
 
         public Color OutlineColor { get; }
+
+        public Color HighlightColor { get; }
 
         public Rgba Rgba { get; }
 
@@ -90,7 +94,7 @@ namespace Zo.Data
 
                 var otherX = x + (int) offset.X;
                 var otherY = y + (int) offset.Y;
-                if ((otherX < 0) || (otherX >= region.Texture.Width) 
+                if ((otherX < 0) || (otherX >= region.Texture.Width)
                     || (otherY < 0) || (otherY >= region.Texture.Height))
                     continue;
                 var otherIndex = otherX + (otherY * region.Texture.Width);

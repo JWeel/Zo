@@ -1,4 +1,5 @@
 ﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
@@ -27,13 +28,15 @@ namespace Zo
         {
             // GraphicsDeviceManager must be set up in this ctor, else InvalidOperationException: No Graphics Device Service 
             // this is because Program calls {Game}.Run() which calls DoInitialize() which calls get_GraphicsDevice()
-            this.Platform = new PlatformManager(() => new GraphicsDeviceManager(this));
-            this.Texture = new TextureRepository(this.GraphicsDevice);
+            this.Platform = new PlatformManager(() => new GraphicsDeviceManager(this), this.SubscribeToLoad);
+            this.Texture = new TextureRepository(this.GraphicsDevice, this.SubscribeToLoad);
         }
 
         #endregion
 
         #region Data Members
+
+        protected event Action<ContentManager> OnLoad;
 
         protected event Action<GameTime> OnUpdate;
 
@@ -73,18 +76,18 @@ namespace Zo
 
         protected override void Initialize()
         {
-            this.Random = new RandomManager(this.Platform.Sizes, subscription => this.OnUpdate += subscription);
-            this.Input = new InputManager(this.Platform.Sizes, subscription => this.OnUpdate += subscription);
-            this.Text = new TextManager(this.Platform.Sizes, subscription => this.OnUpdate += subscription);
-            this.Map = new MapManager(this.Platform.Sizes, this.Random, this.Texture, subscription => this.OnUpdate += subscription);
-            this.Animation = new AnimationManager(subscription => this.OnUpdate += subscription, subscription => this.Map.OnSelected += subscription);// this.Map.SubscribeToSelect);
-            this.Frame = new FrameManager(this.Platform.Sizes, subscription => this.OnUpdate += subscription, subscription => this.OnDraw += subscription);
+            this.Random = new RandomManager(this.Platform.Sizes, this.SubscribeToUpdate);
+            this.Input = new InputManager(this.Platform.Sizes, this.SubscribeToUpdate);
+            this.Text = new TextManager(this.Platform.Sizes, this.SubscribeToLoad, this.SubscribeToUpdate);
+            this.Map = new MapManager(this.Platform.Sizes, this.Random, this.Texture, this.SubscribeToLoad, this.SubscribeToUpdate);
+            this.Animation = new AnimationManager(this.SubscribeToUpdate, this.Map.SubscribeToSelect);
+            this.Frame = new FrameManager(this.Platform.Sizes, this.SubscribeToLoad, this.SubscribeToUpdate, this.SubscribeToDraw);
 
-            // if GameWindow.AllowUserResizing is set in our ctor, 
+            // if GameWindow.AllowUserResizing is set in ctor, 
             //      1 the GameWindow.ClientSizeChanged event gets raised
             //      2 position of window is not centered
-            // therefore we put it here
-            // GameWindow.IsBorderless can be put in our ctor just fine, but is here for consistency.
+            // therefore it is here
+            // GameWindow.IsBorderless can be put in ctor just fine, but is here for consistency.
             this.Window.AllowUserResizing = true;
             this.Window.IsBorderless = true;
             this.Window.ClientSizeChanged += this.OnWindowResize;
@@ -99,13 +102,7 @@ namespace Zo
             this.Content.RootDirectory = CONTENT_ROOT_DIRECTORY;
             this.SpriteBatch = new SpriteBatch(this.GraphicsDevice);
 
-            this.Platform.LoadContent(this.Content);
-            this.Texture.LoadContent(this.Content);
-            this.Text.LoadContent(this.Content);
-
-            this.Map.LoadContent(this.Content);
-            this.Frame.LoadContent(this.Content);
-            // base.LoadContent();
+            this.OnLoad?.Invoke(this.Content);
         }
 
         protected override void Update(GameTime gameTime)
@@ -216,6 +213,26 @@ namespace Zo
                     this.Map.Move(0, 10f);
                 if (this.Input.KeyDown(Keys.Down))
                     this.Map.Move(0, -10f);
+            }
+
+            #endregion
+
+            #region Highlight
+
+            if (this.Input.MouseMoved() && this.Platform.Sizes.ActualMapRectangle.Contains(this.Input.CurrentMouseState))
+            {
+                var relativePosition = (this.Input.CurrentMouseState.ToVector2() - this.Map.ActualPosition) / this.Map.Scale / this.Platform.GlobalScale;
+                switch (this.Map.GetMapType())
+                {
+                    case MapType.Political:
+                        this.Map.HighlightFief(relativePosition);
+                        break;
+                    case MapType.Natural:
+                        break;
+                    case MapType.Geographical:
+                        this.Map.HighlightGeographicalRegion(relativePosition);
+                        break;
+                }
             }
 
             #endregion
@@ -338,7 +355,6 @@ namespace Zo
             this.OnDraw?.Invoke(this.SpriteBatch);
 
             var actualMapScale = this.Map.Scale * this.Platform.GlobalScale;
-
             this.SpriteBatch.DrawAt(
                 texture: this.Texture.MapBackground,
                 position: this.Map.ActualPosition,
@@ -362,16 +378,23 @@ namespace Zo
                             if (this.Map.VisibleLabel)
                                 this.DrawText(fief.Name, (fief.Region.Center * actualMapScale) + this.Map.ActualPosition, depth: 0.45f, center: true);
                         });
-                    // this.Map.GetGeographicalRegions()
-                    //     .Each(region => this.SpriteBatch.DrawAt(
-                    //             texture: region.OutlineTexture,
-                    //             position: (region.Position * actualMapScale) + this.Map.ActualPosition,
-                    //             color: new Color(50, 50, 50, 40),
-                    //             scale: actualMapScale,
-                    //             depth: 0.3f
-                    //         ));
+                    this.Map.HighlightedRegion
+                        ?.Into(region =>
+                            this.SpriteBatch.DrawAt(
+                                texture: region.CombinedTexture,
+                                position: (region.Position * actualMapScale) + this.Map.ActualPosition,
+                                color: region.HighlightColor,
+                                scale: actualMapScale,
+                                depth: 0.3f
+                            ));
                     break;
                 case MapType.Natural:
+                    this.SpriteBatch.DrawAt(
+                        texture: this.Texture.MapBackground,
+                        position: this.Map.ActualPosition,
+                        scale: actualMapScale,
+                        depth: 0f
+                    );
                     if (this.Map.VisibleBorder)
                         this.SpriteBatch.DrawAt(
                             texture: this.Texture.OuterBorder,
@@ -404,6 +427,15 @@ namespace Zo
                             if (this.Map.VisibleLabel)
                                 this.DrawText(region.Id, (region.Center * actualMapScale) + this.Map.ActualPosition, depth: 0.45f, center: true);
                         });
+                    this.Map.HighlightedRegion
+                        ?.Into(region =>
+                            this.SpriteBatch.DrawAt(
+                                texture: region.CombinedTexture,
+                                position: (region.Position * actualMapScale) + this.Map.ActualPosition,
+                                color: region.HighlightColor,
+                                scale: actualMapScale,
+                                depth: 0.3f
+                            ));
                     break;
             }
 
@@ -466,7 +498,6 @@ namespace Zo
                 this.Platform.Sizes.SideTextPosition + new Vector2(0, this.Platform.Sizes.ActualMapHeight * 2 / 5));
 
 
-            // if (this.Map.LastSelectedRegion.HasValue)
             if (this.Map.LastSelection != default)
                 this.DrawText($"Selected: {this.Map.LastSelection.Name}"
                     + Environment.NewLine + $"id: {this.Map.LastSelection.Id}"
@@ -477,13 +508,10 @@ namespace Zo
                     // + Environment.NewLine + $"neighbours: {region.Neighbours.Length}"
                     , this.Platform.Sizes.SideTextPosition + new Vector2(0, this.Platform.Sizes.ActualMapHeight * 52 / 100));
 
-
             this.DrawText($"Map Type: {this.Map.GetMapType()}",
                 this.Platform.Sizes.SideTextPosition + new Vector2(0, this.Platform.Sizes.ActualMapHeight * 73 / 100));
-
             this.DrawText($"Division: {this.Map.GetDivision()}",
                 this.Platform.Sizes.SideTextPosition + new Vector2(0, this.Platform.Sizes.ActualMapHeight * 77 / 100));
-
 
             this.DrawText($"x{this.Input.CurrentMouseState.X} y{this.Input.CurrentMouseState.Y}",
                 this.Platform.Sizes.CursorInfoPosition);
@@ -516,6 +544,12 @@ namespace Zo
         #endregion
 
         #region Helper Methods
+
+        protected void SubscribeToLoad(Action<ContentManager> handler) => this.OnLoad += handler;
+
+        protected void SubscribeToUpdate(Action<GameTime> handler) => this.OnUpdate += handler;
+
+        protected void SubscribeToDraw(Action<SpriteBatch> handler) => this.OnDraw += handler;
 
         protected void DrawText(string text, Vector2 position, Color? color = default, float? scale = default, float? depth = default, bool center = false)
         {
@@ -609,7 +643,7 @@ namespace Zo
         // protected int _resubscribeOnWindowResizeFrameCounter;
         // protected void ResubscribeOnWindowResize(GameTime gameTime)
         // {
-        //     if (_resubscribeOnWindowResizeFrameCounter++ < 100)
+        //     if (_resubscribeOnWindowResizeFrameCounter++ < 10)
         //         return;
 
         //     _resubscribeOnWindowResizeFrameCounter = 0;
