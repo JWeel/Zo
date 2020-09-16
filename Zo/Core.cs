@@ -361,7 +361,7 @@ namespace Zo
                 scale: actualMapScale,
                 depth: 0f
             );
-
+;
             switch (this.Map.GetMapType())
             {
                 case MapType.Political:

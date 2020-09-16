@@ -21,3 +21,16 @@ load regions async
 deselect should be regardless of maptype
 
 if fief is disconnected, have multiple regions?
+
+gameplay could be
+    every g0 should contain a character. each character has liege.
+    independent fief ruler controls direct vassals (and to a lesser extent indirect vassals)
+    there is a fixed number of moments per year (for these notes will be called ticks)
+    during each tick (for now 12 ticks per year) each character can take a certain amount of actions
+    number of actions depends on factors (realm size, advisors, skill, peace/war, popular support, etc)
+    each character commands a certain number of men-at-arms and can call up a militia
+    lieges can demand levies from vassals (% men-at-arms)
+    end of each year every ruler will level up and gain or lose skill points
+    characters gain a lot of skill points while young and less while old
+    actions can be stuff like moving around armies, sending letters, assigning vassals to do stuff
+    goal is up to player, but can expand realm through war, inheritance, and scheming
