@@ -1,11 +1,12 @@
 {
   "version": 2,
-  "dgSpecHash": "4TLdQwkTDTEdMRTV7h4/2p7K0fSgmbZEA7EVnX3/6TG/mt8dDro223X5KCigoXM/PnLTdIPalFVMpXBrzTtbyQ==",
+  "dgSpecHash": "L/YEoViGgxGVxcgUuH9+hWoWrsu+XcIUU1CqcRhlYaQY+sro2hIaO7PT8bFcUmcYisLz0fBrkAJf1ZIygpxDyg==",
   "success": true,
-  "projectFilePath": "D:\\Documents\\Code\\repos\\zo\\Zo\\Zo.csproj",
+  "projectFilePath": "C:\\Users\\josef\\Code\\dotnet\\Zo\\Zo\\Zo.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\admin\\.nuget\\packages\\monogame.content.builder\\3.7.0.4\\monogame.content.builder.3.7.0.4.nupkg.sha512",
-    "C:\\Users\\admin\\.nuget\\packages\\monogame.framework.desktopgl.core\\3.7.0.7\\monogame.framework.desktopgl.core.3.7.0.7.nupkg.sha512"
+    "C:\\Users\\josef\\.nuget\\packages\\monogame.content.builder\\3.7.0.4\\monogame.content.builder.3.7.0.4.nupkg.sha512",
+    "C:\\Users\\josef\\.nuget\\packages\\monogame.framework.desktopgl.core\\3.7.0.7\\monogame.framework.desktopgl.core.3.7.0.7.nupkg.sha512",
+    "C:\\Users\\josef\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\3.1.32\\microsoft.netcore.app.host.win-x64.3.1.32.nupkg.sha512"
   ],
   "logs": []
 }

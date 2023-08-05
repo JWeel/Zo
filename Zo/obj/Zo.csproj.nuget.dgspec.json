@@ -1,23 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "D:\\Documents\\Code\\repos\\zo\\Zo\\Zo.csproj": {}
+    "C:\\Users\\josef\\Code\\dotnet\\Zo\\Zo\\Zo.csproj": {}
   },
   "projects": {
-    "D:\\Documents\\Code\\repos\\zo\\Zo\\Zo.csproj": {
+    "C:\\Users\\josef\\Code\\dotnet\\Zo\\Zo\\Zo.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Documents\\Code\\repos\\zo\\Zo\\Zo.csproj",
+        "projectUniqueName": "C:\\Users\\josef\\Code\\dotnet\\Zo\\Zo\\Zo.csproj",
         "projectName": "Zo",
-        "projectPath": "D:\\Documents\\Code\\repos\\zo\\Zo\\Zo.csproj",
-        "packagesPath": "C:\\Users\\admin\\.nuget\\packages\\",
-        "outputPath": "D:\\Documents\\Code\\repos\\zo\\Zo\\obj\\",
+        "projectPath": "C:\\Users\\josef\\Code\\dotnet\\Zo\\Zo\\Zo.csproj",
+        "packagesPath": "C:\\Users\\josef\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\josef\\Code\\dotnet\\Zo\\Zo\\obj\\",
         "projectStyle": "PackageReference",
-        "fallbackFolders": [
-          "C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder"
-        ],
         "configFilePaths": [
-          "C:\\Users\\admin\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\josef\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "netcoreapp3.1"
@@ -27,6 +24,7 @@
         },
         "frameworks": {
           "netcoreapp3.1": {
+            "targetAlias": "netcoreapp3.1",
             "projectReferences": {}
           }
         },
@@ -38,6 +36,7 @@
       },
       "frameworks": {
         "netcoreapp3.1": {
+          "targetAlias": "netcoreapp3.1",
           "dependencies": {
             "MonoGame.Content.Builder": {
               "target": "Package",
@@ -54,16 +53,23 @@
             "net47",
             "net471",
             "net472",
-            "net48"
+            "net48",
+            "net481"
           ],
           "assetTargetFallback": true,
           "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.NETCore.App.Host.win-x64",
+              "version": "[3.1.32, 3.1.32]"
+            }
+          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\3.1.300\\RuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\7.0.102\\RuntimeIdentifierGraph.json"
         }
       }
     }

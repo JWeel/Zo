@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PipelineBuildEvent xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <SourceFile>D:/Documents/Code/repos/zo/Zo/Content/Area/a0.png</SourceFile>
-  <SourceTime>2020-06-05T17:34:14.671428-04:00</SourceTime>
-  <DestFile>D:/Documents/Code/repos/zo/Zo/Content/bin/DesktopGL/Content/Area/a0.xnb</DestFile>
-  <DestTime>2020-08-10T19:35:00.2760979-04:00</DestTime>
+  <SourceFile>C:/Users/josef/Code/dotnet/Zo/Zo/Content/Area/a0.png</SourceFile>
+  <SourceTime>2023-03-23T22:21:33.5974122-04:00</SourceTime>
+  <DestFile>C:/Users/josef/Code/dotnet/Zo/Zo/Content/bin/DesktopGL/Content/Area/a0.xnb</DestFile>
+  <DestTime>2023-03-23T22:22:40.9005763-04:00</DestTime>
   <Importer>TextureImporter</Importer>
   <ImporterTime>2018-01-13T19:18:24-05:00</ImporterTime>
   <Processor>TextureProcessor</Processor>
